@@ -1,0 +1,20 @@
+services:
+  main-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - '8002:8002'
+    restart: always
+  mongo:
+    image: mongo:latest
+    restart: always
+    container_name: mongo_dbInventory
+    ports:
+      - '27018:27017'
+    volumes:
+      - mongo-data:/data/db
+volumes:
+  mongo-data:

@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: Energy In Motion
+  version: 1.0.1
+  description: API Collection
+
+servers:
+  - url: http://localhost:8001/api
+    description: Local server
+tags:
+  - name: Auth
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedErrorResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: true
+        msg:
+          type: string
+        data:
+          type: object
+
+    BadRequestErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        msg:
+          type: string
+
+    UnauthorizedErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        msg:
+          type: string
+
+    InternalServerErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        msg:
+          type: string
