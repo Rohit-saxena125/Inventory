@@ -27,7 +27,6 @@ const userSchema = new mongoose.Schema(
       default: USER.ROLE[2],
     },
     createdBy: { type: mongoose.Types.ObjectId, ref: 'User' },
-    isDeleted: commonSchema,
   },
   { timestamps: true, versionKey: false }
 );

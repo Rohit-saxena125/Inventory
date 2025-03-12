@@ -15,14 +15,6 @@ exports.sendOtp = async (req, res, next) => {
     if (!user) {
       return next(badRequestErrorResponse(res, 'Invalid email or password'));
     }
-    if (user.isDeleted.isDeleted) {
-      return next(
-        badRequestErrorResponse(
-          res,
-          'Account is deleted, please contact admin!'
-        )
-      );
-    }
       const otp = generateCode(4, {
         lowerCaseAlphabets: false,
         upperCaseAlphabets: false,
