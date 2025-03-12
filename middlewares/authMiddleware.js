@@ -49,13 +49,6 @@ exports.tokenVerify = async (req, res, next) => {
           return unauthorizedErrorResponse(res, 'Invalid token');
         }
 
-        if (user.isDeleted.isDeleted) {
-          return unauthorizedErrorResponse(
-            res,
-            'Account deleted or disabled. Please contact admin.'
-          );
-        }
-
         if (accessTokenExpired) {
           res
             .cookie('jwt', user.getSignedJwtRefreshToken(), {
