@@ -29,7 +29,7 @@ exports.sendOtp = async (req, res, next) => {
         subject: 'OTP Verification',
         message: htmlMail(message),
       });
-      return successResponse(res, 'Otp Send Successfully', user);
+      return successResponse(res, 'Otp Send Successfully');
   } catch (error) {
     return next(internalServerErrorResponse(res, error));
   }
