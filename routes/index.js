@@ -1,9 +1,9 @@
 const { v4: uuid } = require('uuid');
 const router = require('express').Router();
 const authRoutes = require('./auth/authRoute');
-// const inventoryRoutes = require('');
+const unitRoutes = require('./unit/unitRoute');
 router.use('/auth', authRoutes);
-// router.use('/inventory', inventoryRoutes);
+router.use('/unit', unitRoutes);
 router.use((req, res, next) => {
   req.identifier = uuid();
   console.log(

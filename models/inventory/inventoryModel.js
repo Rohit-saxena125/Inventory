@@ -21,19 +21,6 @@ const inventorySchema = new mongoose.Schema({
     type:Number,
     default:0
   },
-  openingStock:{
-    type:Number,
-    default:0
-  },
-  minStockQty:{
-    type:Number,
-    default:0
-  },
-  asOfDate:{
-    type:Date,
-    required:true,
-    default: Date.now()
-  },
 },{timestamps:true, versionKey:false});
 
 module.exports = mongoose.model("Inventory",inventorySchema);

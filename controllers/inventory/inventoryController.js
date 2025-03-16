@@ -8,7 +8,7 @@ const {pagination} = require("../../utils/pagination");
 
 exports.createInventory = async (req,res ,next) => {
     try {
-        const {itemName, quantity, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate} = req.body;
+        const {itemName, quantity, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
         const inventoryExist = await Inventory.findOne({itemName});
         if(inventoryExist){
             return badRequestErrorResponse(res, "Inventory already exist");
@@ -19,9 +19,6 @@ exports.createInventory = async (req,res ,next) => {
             units,
             purchasePrice,
             salePrice,
-            openingStock,
-            minStockQty,
-            asOfDate
         });
         return successResponse(res, "Inventory created successfully", inventory);
     } catch (error) {

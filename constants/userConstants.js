@@ -1,3 +1,7 @@
 exports.USER = {
-  ROLE: ['Admin', 'Cashier', 'User'],
+  ROLE: ['Admin', 'Cashier'],
 };
+
+exports.ORDER = {
+  STATUS : ['Sales','Opening','Add','Reduce']
+}
