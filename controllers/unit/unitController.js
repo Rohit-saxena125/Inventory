@@ -32,7 +32,7 @@ exports.fetchUnits = async(req,res,next) => {
                 $options: "i"
             }
         }
-        const units = await pagination(Unit, query, "", page, limit);
+        const units = await pagination(Unit, query,page, limit);
         return successResponse(res, "Units fetched successfully", units);
     } catch (error) {
         return internalServerErrorResponse(res, error);

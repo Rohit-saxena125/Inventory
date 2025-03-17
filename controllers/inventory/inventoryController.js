@@ -38,8 +38,8 @@ exports.createInventory = async (req,res ,next) => {
 }
 
 exports.getAllInventory = async (req,res ,next) => {
-    const { page, limit , search, } = req.query;
     try {
+        const { page, limit , search, } = req.query;
         const query = {};
         if(search){
             query.itemName = {
@@ -48,7 +48,7 @@ exports.getAllInventory = async (req,res ,next) => {
             }
         }
         const inventory = await
-        pagination(Inventory, query, "", page, limit);
+        pagination(Inventory, query,  page, limit);
         return successResponse(res, "Inventory fetched successfully", inventory);
     }
     catch (error) {
