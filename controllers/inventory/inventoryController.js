@@ -63,6 +63,7 @@ exports.getInventoryById = async (req,res ,next) => {
             return badRequestErrorResponse(res, "Inventory not found");
         }
         const openingStock = await Sale.findOne({itemId:inventory._id});
+        inventory = inventory.toObject();
         inventory.openingStock = openingStock;
         inventory.stockValue = (inventory.quantity * inventory.salePrice).toFixed(2);
         return successResponse(res, "Inventory fetched successfully", inventory);
