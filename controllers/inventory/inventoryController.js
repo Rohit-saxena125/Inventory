@@ -46,8 +46,13 @@ exports.getAllInventory = async (req,res ,next) => {
                 $options: "i"
             }
         }
-        const inventory = await
-        pagination(Inventory, query,  page, limit);
+        const inventory = await pagination(Inventory, query,  page, limit);
+        inventory.result = inventory.result.map(async (item) => {
+            return {
+                ...item,
+                quantity: 15,
+            }
+        });
         return successResponse(res, "Inventory fetched successfully", inventory);
     }
     catch (error) {
@@ -64,7 +69,8 @@ exports.getInventoryById = async (req,res ,next) => {
         const openingStock = await Sale.findOne({itemId:inventory._id});
         inventory = inventory.toObject();
         inventory.openingStock = openingStock;
-        inventory.stockValue = (inventory.quantity * inventory.salePrice).toFixed(2);
+        inventory.stockValue = (openingStock.quantity* inventory.salePrice).toFixed(2);
+        inventory.quantity = openingStock.quantity;
         return successResponse(res, "Inventory fetched successfully", inventory);
     } catch (error) {
         return internalServerErrorResponse(res, error);
