@@ -49,7 +49,7 @@ exports.getAllInventory = async (req,res ,next) => {
         const inventory = await pagination(Inventory, query,  page, limit);
         inventory.result = inventory.result.map(async (item) => {
             return {
-                ...item,
+                ...item.toObject(),
                 quantity: 15,
             }
         });
