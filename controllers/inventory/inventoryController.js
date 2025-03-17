@@ -113,3 +113,22 @@ exports.deleteInventory = async (req,res ,next) => {
         return internalServerErrorResponse(res, error);
     }
 }
+
+exports.addReduceInventory = async (req,res ,next) => {
+    try {
+        const type = req.query.type;
+        const itemId = req.params.id;
+        const {quantity,pricePerUnit,description,saleDate} = req.body;
+        const addReduce = await Sale.create({
+            orderType:type,
+            itemId:itemId,
+            quantity:quantity,
+            pricePerUnit:pricePerUnit,
+            description:description,
+            saleDate:saleDate
+        })
+        return successResponse(res, `Inventory ${type} successfully`);
+    } catch (error) {
+        return internalServerErrorResponse(res, error);
+    }
+};

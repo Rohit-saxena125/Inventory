@@ -7,5 +7,6 @@ router.get('/fetch',tokenVerify,checkRole(['Admin', 'Cashier']),inventoryControl
 router.get('/fetch/:id',tokenVerify,checkRole(['Admin']),inventoryController.getInventoryById);
 router.patch('/update/:id',tokenVerify,checkRole(['Admin']),inventoryController.updateInventory);
 router.patch('/delete/:id',tokenVerify,checkRole(['Admin']),inventoryController.deleteInventory);
+router.patch('/updateStock/:id',tokenVerify,checkRole(['Admin']),inventoryController.updateStock);
 
 module.exports = router;
