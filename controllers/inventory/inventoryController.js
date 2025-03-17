@@ -58,7 +58,7 @@ exports.getAllInventory = async (req,res ,next) => {
 
 exports.getInventoryById = async (req,res ,next) => {
     try {
-        const inventory = await Inventory.findById(req.params.id);
+        let inventory = await Inventory.findById(req.params.id);
         if(!inventory){
             return badRequestErrorResponse(res, "Inventory not found");
         }
