@@ -47,12 +47,12 @@ exports.getAllInventory = async (req,res ,next) => {
             }
         }
         const inventory = await pagination(Inventory, query,  page, limit);
-        inventory.result = inventory.result.map(async (item) => {
+        inventory.result = await Promise.all(inventory.result.map(async (item) => {
             return {
                 ...item.toObject(),
-                quantity: 15,
+                quantity: item.quantity||50,
             }
-        });
+        }));
         return successResponse(res, "Inventory fetched successfully", inventory);
     }
     catch (error) {
@@ -76,7 +76,6 @@ exports.getInventoryById = async (req,res ,next) => {
         return internalServerErrorResponse(res, error);
     }
 }
-
 exports.updateInventory = async (req,res ,next) => {
     try {
         const {itemName, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
