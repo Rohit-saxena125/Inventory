@@ -1,4 +1,5 @@
 const Inventory = require('../../models/inventory/inventoryModel');
+const Sale = require('../../models/Sales/salesModel');
 const {
   successResponse,
   badRequestErrorResponse,
@@ -14,12 +15,22 @@ exports.createInventory = async (req,res ,next) => {
             return badRequestErrorResponse(res, "Inventory already exist");
         }
         const inventory = await Inventory.create({
-            itemName,
-            quantity,
-            units,
-            purchasePrice,
-            salePrice,
+            itemName:itemName,
+            quantity:quantity,
+            units:units,
+            purchasePrice:purchasePrice,
+            salePrice: salePrice,
         });
+        if(openingStock>0 || minStockQty>0 || payPerUnit>0){
+            const  openingStockSale = await Sale.create({
+                orderType:"Opening",
+                itemId:inventory._id,
+                quantity:openingStock,
+                minQty:minStockQty,
+                saleDate:asOfDate,
+                pricePerUnit:payPerUnit
+            })
+        }
         return successResponse(res, "Inventory created successfully", inventory);
     } catch (error) {
         return internalServerErrorResponse(res, error.message);
@@ -51,6 +62,8 @@ exports.getInventoryById = async (req,res ,next) => {
         if(!inventory){
             return badRequestErrorResponse(res, "Inventory not found");
         }
+        const openingStock = await Sale.findOne({itemId:inventory._id});
+        inventory.openingStock = openingStock;
         return successResponse(res, "Inventory fetched successfully", inventory);
     } catch (error) {
         return internalServerErrorResponse(res, error);
@@ -59,10 +72,28 @@ exports.getInventoryById = async (req,res ,next) => {
 
 exports.updateInventory = async (req,res ,next) => {
     try {
+        const {itemName, quantity, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
         const inventory = await Inventory.findByIdAndUpdate(req
-            .params.id, req.body, {new: true});
+            .params.id, {$set:{itemName:itemName,
+                quantity:quantity,
+                units:units,
+                purchasePrice:purchasePrice,
+                salePrice: salePrice,}}, {new: true,runValidators:true});
         if(!inventory){
             return badRequestErrorResponse(res, "Inventory not found");
+        }
+        if(openingStock>0 || minStockQty>0 || payPerUnit>0){
+            const lastOpeningStock = await Sale.findOne({itemId:inventory._id});
+            if (lastOpeningStock){
+                const  openingStockSale = await Sale.findOneAndUpdate({_id:lastOpeningStock._id},{
+                    $set: {
+                    quantity:openingStock,
+                    minQty:minStockQty,
+                    saleDate:asOfDate,
+                    pricePerUnit:payPerUnit
+                }},{new:true,runValidators:true})
+            }
+            
         }
         return successResponse(res, "Inventory updated successfully", inventory);
     }

@@ -9,11 +9,17 @@ const salesSchema = new mongoose.Schema({
     },
     quantity:{
         type:String,
-        required:true
+        required:true,
+        default:0
     },
-    price:{
+    pricePerUnit:{
         type:Number,
-        required : true
+        required : true,
+        default:0
+        
+    },
+    description:{
+        type: String
     },
     saleDate:{
         type:Date,
@@ -26,5 +32,10 @@ const salesSchema = new mongoose.Schema({
     },
     invoiceNumber:{
         type:Number,
+    },
+    minQty:{
+        type:Number
     }
 },{timestamps:true, versionKey:false});
+
+module.exports = mongoose.model("Sale",salesSchema);
