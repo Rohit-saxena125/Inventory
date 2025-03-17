@@ -9,14 +9,13 @@ const {pagination} = require("../../utils/pagination");
 
 exports.createInventory = async (req,res ,next) => {
     try {
-        const {itemName, quantity, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
+        const {itemName,  units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
         const inventoryExist = await Inventory.findOne({itemName});
         if(inventoryExist){
             return badRequestErrorResponse(res, "Inventory already exist");
         }
         const inventory = await Inventory.create({
             itemName:itemName,
-            quantity:quantity,
             units:units,
             purchasePrice:purchasePrice,
             salePrice: salePrice,
@@ -74,10 +73,9 @@ exports.getInventoryById = async (req,res ,next) => {
 
 exports.updateInventory = async (req,res ,next) => {
     try {
-        const {itemName, quantity, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
+        const {itemName, units, purchasePrice, salePrice, openingStock, minStockQty, asOfDate,payPerUnit} = req.body;
         const inventory = await Inventory.findByIdAndUpdate(req
             .params.id, {$set:{itemName:itemName,
-                quantity:quantity,
                 units:units,
                 purchasePrice:purchasePrice,
                 salePrice: salePrice,}}, {new: true,runValidators:true});
