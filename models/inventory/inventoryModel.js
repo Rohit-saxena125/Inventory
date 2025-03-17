@@ -14,12 +14,12 @@ const inventorySchema = new mongoose.Schema({
     required : true
   },
   purchasePrice:{
-    type:Number,
-    default:0
+    type:String,
+    default:"0"
   },
   salePrice:{
-    type:Number,
-    default:0
+    type:String,
+    default:"0"
   },
 },{timestamps:true, versionKey:false});
 

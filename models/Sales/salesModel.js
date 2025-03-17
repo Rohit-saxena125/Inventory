@@ -10,12 +10,12 @@ const salesSchema = new mongoose.Schema({
     quantity:{
         type:String,
         required:true,
-        default:0
+        default:"0"
     },
     pricePerUnit:{
-        type:Number,
+        type:String,
         required : true,
-        default:0
+        default:"0"
         
     },
     description:{
@@ -31,10 +31,10 @@ const salesSchema = new mongoose.Schema({
         required:true
     },
     invoiceNumber:{
-        type:Number,
+        type:String,
     },
     minQty:{
-        type:Number
+        type:String
     }
 },{timestamps:true, versionKey:false});
 
