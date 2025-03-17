@@ -64,6 +64,7 @@ exports.getInventoryById = async (req,res ,next) => {
         }
         const openingStock = await Sale.findOne({itemId:inventory._id});
         inventory.openingStock = openingStock;
+        inventory.stockValue = (inventory.quantity * inventory.salePrice).toFixed(2);
         return successResponse(res, "Inventory fetched successfully", inventory);
     } catch (error) {
         return internalServerErrorResponse(res, error);
