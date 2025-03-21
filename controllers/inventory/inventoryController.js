@@ -178,6 +178,26 @@ exports.addReduceInventory = async (req, res, next) => {
     const type = req.query.type;
     const itemId = req.params.id;
     const { quantity, pricePerUnit, description, saleDate } = req.body;
+    if(req.query.transactionId){
+      let sale = await Sale.findById({_id:req.query.transactionId});
+      if(!sale){
+        return badRequestErrorResponse(res,"Transaction not found");
+      }
+      if(sale.orderType === "Opening"){
+        return badRequestErrorResponse(res,"Opening stock cannot be updated");
+      }
+      if(sale.orderType === "Sale"){
+        return badRequestErrorResponse(res,"Sale stock cannot be updated");
+      }
+      sale = await Sale.findByIdAndUpdate({_id:sale._id},{$set:{
+        orderType:sale.orderType,
+        quantity:quantity,
+        pricePerUnit:pricePerUnit,
+        description:description,
+        saleDate:saleDate
+      }},{new:true,runValidators:true});
+      return successResponse(res,"Inventory updated successfully",sale);
+    }
     const addReduce = await Sale.create({
       orderType: type,
       itemId: itemId,

@@ -48,3 +48,53 @@ exports.fetchSalesById = async(req,res) =>{
         return internalServerErrorResponse(res,error);
     }
 }
+
+exports.createSales = async(req,res) =>{
+    try {
+       const {quantity,pricePerUnit,description,saleDate,itemId,customerName} = req.body;
+         const sales = await Sale.create({
+                orderType:"Sale",
+              quantity,
+              pricePerUnit,
+              description,
+              saleDate,
+              itemId,
+              customerName
+         });
+    } catch (error) {
+        return internalServerErrorResponse(res,error);
+    }
+}
+
+exports.updateSales = async(req,res) =>{
+    try {
+        const {id} = req.params;
+        const sales = await Sale.findById(id);
+        if(!sales){
+            return badRequestErrorResponse(res,"Sales not found");
+        }
+        if(sales.orderType === "Opening"){
+            return badRequestErrorResponse(res,"Opening stock cannot be updated");
+        }
+
+    } catch (error) {
+        return internalServerErrorResponse(res,error);
+    }
+}
+
+exports.deleteSales = async(req,res) =>{
+    try {
+        const {id} = req.params;
+        const sales = await Sale.findById(id);
+        if(!sales){
+            return badRequestErrorResponse(res,"Sales not found");
+        }
+        if(sales.orderType === "Opening"){
+            return badRequestErrorResponse(res,"Opening stock cannot be deleted");
+        }
+        await Sale.findByIdAndDelete(id);
+        return successResponse(res,"Sales deleted successfully");
+    } catch (error) {
+        return internalServerErrorResponse(res,error);
+    }
+}
