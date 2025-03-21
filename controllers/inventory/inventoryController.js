@@ -61,14 +61,11 @@ exports.getAllInventory = async (req, res, next) => {
         const sales = await Sale.find({ itemId: item._id });
         let quantity = 0;
         sales.forEach((sale) => {
-          quantity = parseInt(sale.quantity, 10);
-          console.log(quantity);
           if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
-            quantity += quantity;
+            quantity += parseInt(sale.quantity, 10);
           } else if (sale.orderType === 'Sale' || sale.orderType === 'Reduce') {
-            quantity -= quantity;
+            quantity -= parseInt(sale.quantity, 10);
           }
-          console.log(quantity);
         });
         return {
           ...item.toObject(),
