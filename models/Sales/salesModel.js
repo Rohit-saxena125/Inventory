@@ -33,6 +33,9 @@ const salesSchema = new mongoose.Schema({
     invoiceNumber:{
         type:String,
     },
+    customerName:{
+        type:String
+    },
     minQty:{
         type:String
     }

@@ -20,6 +20,13 @@ exports.fetchSales = async(req,res) =>{
            }
        }
        const sales = await pagination(Sale,query,page,limit);
+       sales.result = await Promise.all(sales.result.map(async (item) =>{
+        const totalPrice = (parseFloat(item.pricePerUnit) * parseFloat(item.quantity)).toFixed(2);
+        return{
+            ...item.toObject(),
+            totalPrice: totalPrice
+        }
+       }));
        return successResponse(res,"Sales fetched successfully",sales);
     } catch (error) {
         return internalServerErrorResponse(res,error);
