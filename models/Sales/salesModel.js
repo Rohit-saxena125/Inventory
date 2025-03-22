@@ -38,7 +38,7 @@ const salesSchema = new mongoose.Schema({
         default:"0"
     },
     invoiceNumber:{
-        type:String,
+        type:Number,
     },
     customerName:{
         type:String
