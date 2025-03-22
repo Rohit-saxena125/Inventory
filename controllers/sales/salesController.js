@@ -6,7 +6,8 @@ const {
   internalServerErrorResponse,
 } = require('../../utils/customResponse');
 const { pagination } = require('../../utils/pagination');
-
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
 exports.fetchSales = async (req, res) => {
   try {
     const { page, limit, search, itemId } = req.query;
@@ -148,7 +149,27 @@ exports.deleteSales = async (req, res) => {
   }
 };
 
-
+exports.downloadInvoice = async(req,res) => {
+  try {
+    const { id } = req.params;
+    const sales = await Sale.findById(id).populate('itemId');
+    if (!sales) {
+      return badRequestErrorResponse(res, 'Sales not found');
+    }
+    if(sales.orderType === 'Sales'){
+      const outputPath = `invoice-${sales.invoiceNumber}.pdf`;
+    await createInvoicePDF(sales, outputPath);
+    }
+    res.download(outputPath, `invoice-${sales.invoiceNumber}.pdf`, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        res.status(500).send('Could not download the file.');
+      }
+    });
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
 async function generateInvoiceNumber() {
     const latestSale = await Sale.findOne({orderType:"Sales"}).sort({_id:-1});
     if (latestSale && !isNaN(latestSale.invoiceNumber)) {
@@ -160,3 +181,34 @@ async function generateInvoiceNumber() {
   async function updateInvoiceNumber(invoiceNumber) {
     await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumber } }, { upsert: true });
   }
+
+
+
+async function createInvoicePDF(invoiceData, outputPath) {
+  const doc = new PDFDocument();
+  const stream = fs.createWriteStream(outputPath);
+  doc.pipe(stream);
+  doc.fontSize(20).text('Invoice', { align: 'center' });
+  doc.moveDown();
+
+  doc.fontSize(14).text(`Invoice Number: ${invoiceData.invoiceNumber}`);
+  doc.fontSize(14).text(`Customer Name: ${invoiceData.customerName}`);
+  doc.fontSize(14).text(`Sale Date: ${new Date(invoiceData.saleDate).toLocaleDateString()}`);
+  doc.moveDown();
+
+  doc.fontSize(12).text(`Item: ${invoiceData.itemId.itemName}`);
+  doc.fontSize(12).text(`Quantity: ${invoiceData.quantity}`);
+  doc.fontSize(12).text(`Price Per Unit: $${invoiceData.pricePerUnit}`);
+  doc.fontSize(12).text(`Discount: $${invoiceData.discount}`);
+  doc.fontSize(12).text(`Total Amount: $${invoiceData.totalAmount}`);
+  doc.moveDown();
+
+  doc.fontSize(12).text(`Description: ${invoiceData.description}`);
+
+  doc.end();
+
+  return new Promise((resolve, reject) => {
+    stream.on('finish', () => resolve(outputPath));
+    stream.on('error', reject);
+  });
+}

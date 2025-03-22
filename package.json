@@ -28,6 +28,7 @@
     "nodemailer": "^6.10.0",
     "otp-generator": "^4.0.1",
     "path": "^0.12.7",
+    "pdfkit": "^0.16.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",

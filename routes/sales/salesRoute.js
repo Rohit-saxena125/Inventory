@@ -7,5 +7,6 @@ router.get('/fetchSales/:id', tokenVerify, checkRole(['Admin']), salesController
 router.post('/createSales', tokenVerify, checkRole(['Admin','Cashier']), salesController.createSales);
 router.patch('/updateSales/:id', tokenVerify, checkRole(['Admin']), salesController.updateSales);
 router.patch('/deleteSales/:id', tokenVerify, checkRole(['Admin']), salesController.deleteSales);
+router.get('/fetchSalesInvoice/:id', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchSalesInvoice);
 
 module.exports = router;
