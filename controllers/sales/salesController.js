@@ -77,7 +77,7 @@ exports.createSales = async (req, res) => {
         return badRequestErrorResponse(res, 'Inventory not found');
       }
     }
-    const sales = await Sale.create({
+    let sales = await Sale.create({
       orderType: 'Sales',
       quantity,
       pricePerUnit,
