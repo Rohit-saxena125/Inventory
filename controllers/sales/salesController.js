@@ -29,7 +29,7 @@ exports.fetchSales = async (req, res) => {
         ).toFixed(2);
         return {
           ...item.toObject(),
-          totalPrice: totalPrice,
+          totalPrice: totalPrice-parseFloat(item.discount),
         };
       })
     );
