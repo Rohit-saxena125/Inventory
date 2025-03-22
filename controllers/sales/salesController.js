@@ -1,4 +1,5 @@
 const Sale = require('../../models/Sales/salesModel');
+const Inventory = require('../../models/inventory/inventoryModel');
 const InvoiceCounter = require('../../models/Sales/invoiceCounterModel');
 const {
   successResponse,
@@ -68,6 +69,14 @@ exports.createSales = async (req, res) => {
     } = req.body;
     let invoiceNumber = await generateInvoiceNumber();
     await updateInvoiceNumber(invoiceNumber);
+    let inventory;
+    if(itemId){
+       inventory = await Inventory.findById
+      (itemId);
+      if (!inventory) {
+        return badRequestErrorResponse(res, 'Inventory not found');
+      }
+    }
     const sales = await Sale.create({
       orderType: 'Sales',
       quantity,
@@ -80,6 +89,9 @@ exports.createSales = async (req, res) => {
       totalAmount,
       invoiceNumber,
     });
+    sales = sales.toObject();
+    sales.itemName = inventory.name;
+    sales.unit = inventory.units;
     return successResponse(res, 'Sales created successfully', sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
