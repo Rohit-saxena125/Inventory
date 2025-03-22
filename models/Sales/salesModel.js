@@ -29,6 +29,14 @@ const salesSchema = new mongoose.Schema({
         ref:"Inventory",
         required:true
     },
+    discount:{
+        type:String,
+        default:"0"
+    },
+    totalAmount:{
+        type:String,
+        default:"0"
+    },
     invoiceNumber:{
         type:String,
     },
