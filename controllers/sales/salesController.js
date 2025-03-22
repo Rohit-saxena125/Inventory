@@ -159,13 +159,14 @@ exports.downloadInvoice = async(req,res) => {
     if(sales.orderType === 'Sales'){
       const outputPath = `invoice-${sales.invoiceNumber}.pdf`;
     await createInvoicePDF(sales, outputPath);
-    }
     res.download(outputPath, `invoice-${sales.invoiceNumber}.pdf`, (err) => {
       if (err) {
         console.error('Error sending file:', err);
         res.status(500).send('Could not download the file.');
       }
     });
+    }
+    return successResponse(res, 'Invoice downloaded successfully');
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
