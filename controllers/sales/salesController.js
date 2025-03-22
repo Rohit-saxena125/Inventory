@@ -42,7 +42,7 @@ exports.fetchSales = async (req, res) => {
 exports.fetchSalesById = async (req, res) => {
   try {
     const { id } = req.params;
-    const sales = await Sale.findById({_id:id,isDeleted:false}).populate('itemId');
+    const sales = await Sale.findOne({_id:id,isDeleted:false}).populate('itemId');
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
