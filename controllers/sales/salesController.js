@@ -81,7 +81,7 @@ exports.createSales = async (req, res) => {
       invoiceNumber,
     });
     const sale = await Sale.findById({_id:sales._id}).populate({ path: 'itemId' });
-    return successResponse(res, 'Sales created successfully', sale,sales);
+    return successResponse(res, 'Sales created successfully', {sale,sales});
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
