@@ -149,7 +149,7 @@ exports.deleteSales = async (req, res) => {
 
 
 async function generateInvoiceNumber() {
-    const latestSale = await Sale.findOne({orderType:"Sale"}).sort({_id:-1});
+    const latestSale = await Sale.findOne({orderType:"Sales"}).sort({_id:-1});
     if (latestSale && !isNaN(latestSale.invoiceNumber)) {
       return latestSale.invoiceNumber + 1;
     }
