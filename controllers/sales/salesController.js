@@ -140,7 +140,7 @@ exports.deleteSales = async (req, res) => {
     if (sales.orderType === 'Opening') {
       return badRequestErrorResponse(res, 'Opening stock cannot be deleted');
     }
-    if (sales.orderType === 'Sale') {
+    if (sales.orderType === 'Sales') {
     await Sale.findByIdAndUpdate(id,{$set:{isDeleted:true}},{new:true,runValidators:true});
     }
     return successResponse(res, 'Sales deleted successfully');
