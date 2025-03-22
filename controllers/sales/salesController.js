@@ -11,7 +11,7 @@ const { pagination } = require('../../utils/pagination');
 exports.fetchSales = async (req, res) => {
   try {
     const { page, limit, search, itemId } = req.query;
-    const query = {};
+    const query = {isDeleted:false};
     if (itemId) {
       query.itemId = itemId;
     }
@@ -42,7 +42,7 @@ exports.fetchSales = async (req, res) => {
 exports.fetchSalesById = async (req, res) => {
   try {
     const { id } = req.params;
-    const sales = await Sale.findById(id).populate('itemId');
+    const sales = await Sale.findById({_id:id,isDeleted:false}).populate('itemId');
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
@@ -141,7 +141,7 @@ exports.deleteSales = async (req, res) => {
       return badRequestErrorResponse(res, 'Opening stock cannot be deleted');
     }
     if (sales.orderType === 'Sale') {
-    await Sale.findByIdAndDelete(id);
+    await Sale.findByIdAndUpdate(id,{$set:{isDeleted:true}},{new:true,runValidators:true});
     }
     return successResponse(res, 'Sales deleted successfully');
   } catch (error) {

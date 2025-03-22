@@ -45,7 +45,11 @@ const salesSchema = new mongoose.Schema({
     },
     minQty:{
         type:String
-    }
+    },
+    isDeleted:{
+        type: Boolean,
+        default: false,
+    },
 },{timestamps:true, versionKey:false});
 
 module.exports = mongoose.model("Sale",salesSchema);
