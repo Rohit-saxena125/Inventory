@@ -69,7 +69,7 @@ exports.createSales = async (req, res) => {
     let invoiceNumber = await generateInvoiceNumber();
     await updateInvoiceNumber(invoiceNumber);
     const sales = await Sale.create({
-      orderType: 'Sale',
+      orderType: 'Sales',
       quantity,
       pricePerUnit,
       description,
@@ -106,10 +106,10 @@ exports.updateSales = async (req, res) => {
     if (sales.orderType === 'Opening') {
       return badRequestErrorResponse(res, 'Opening stock cannot be updated');
     }
-    if (sales.orderType === 'Sale') {
+    if (sales.orderType === 'Sales') {
       const updatedSales = await Sale.findByIdAndUpdate
         (id, {
-          orderType: 'Sale',
+          orderType: 'Sales',
           quantity,
           pricePerUnit,
           description,
