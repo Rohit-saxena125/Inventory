@@ -1,5 +1,4 @@
 const Sale = require('../../models/Sales/salesModel');
-const Inventory = require('../../models/inventory/inventoryModel');
 const InvoiceCounter = require('../../models/Sales/invoiceCounterModel');
 const {
   successResponse,
@@ -82,7 +81,7 @@ exports.createSales = async (req, res) => {
       invoiceNumber,
     });
     const sale = await Sale.findById({_id:sales._id}).populate('itemId');
-    return successResponse(res, 'Sales created successfully', sale);
+    return successResponse(res, 'Sales created successfully', sale,sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
