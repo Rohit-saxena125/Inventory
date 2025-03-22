@@ -2,7 +2,7 @@ exports.pagination = async (
   model,
   query,
   page = 1,
-  limit = 10,
+  limit = 1000,
   select,
   sort,
   populate
