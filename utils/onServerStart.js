@@ -12,7 +12,6 @@ exports.createAdmin = async () => {
       email: process.env.ADMIN_EMAIL,
       phone: process.env.ADMIN_PHONE,
       role: 'Admin',
-      password: process.env.ADMIN_PASSWORD,
     });
     await admin.save();
     console.log('Admin Created');

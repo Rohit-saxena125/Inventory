@@ -22,8 +22,7 @@ const salesSchema = new mongoose.Schema({
         type: String
     },
     saleDate:{
-        type:Date,
-        default: Date.now()
+        type:Date
     },
     itemId:{
         type:mongoose.Schema.Types.ObjectId,
