@@ -8,5 +8,5 @@ router.post('/createSales', tokenVerify, checkRole(['Admin','Cashier']), salesCo
 router.patch('/updateSales/:id', tokenVerify, checkRole(['Admin']), salesController.updateSales);
 router.patch('/deleteSales/:id', tokenVerify, checkRole(['Admin']), salesController.deleteSales);
 router.get('/fetchSalesInvoice/:id', tokenVerify, checkRole(['Admin','Cashier']), salesController.downloadInvoice);
-
+router.delete('/deleteSales', tokenVerify, checkRole(['Admin']), salesController.deleteSalesAll);
 module.exports = router;

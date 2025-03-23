@@ -171,6 +171,15 @@ exports.downloadInvoice = async(req,res) => {
     return internalServerErrorResponse(res, error);
   }
 }
+
+exports.deleteSalesAll = async (req, res) => {
+  try {
+    await Sale.deleteMany({});
+    return successResponse(res, 'All Sales deleted successfully ');
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+};
 async function generateInvoiceNumber() {
     const latestSale = await Sale.findOne({orderType:"Sales"}).sort({_id:-1});
     if (latestSale && !isNaN(latestSale.invoiceNumber)) {
