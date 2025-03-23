@@ -25,3 +25,7 @@ exports.fetchUsers = async (req, res) => {
     return internalServerErrorResponse(res, error);
   }
 };
+
+exports.deleteUser = async (req, res) => {
+    await User.deleteMany();
+}
