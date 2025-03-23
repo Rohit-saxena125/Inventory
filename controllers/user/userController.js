@@ -19,7 +19,7 @@ exports.fetchUsers = async (req, res) => {
         $options: 'i',
       };
     }
-    const users = await pagination(User, query, page, limit, '_id,name');
+    const users = await pagination(User, query, page, limit, '_id name');
     return successResponse(res, 'Users fetched successfully', users);
   } catch (error) {
     return internalServerErrorResponse(res, error);
