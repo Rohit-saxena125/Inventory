@@ -191,6 +191,16 @@ async function generateInvoiceNumber() {
   }
 
   async function createInvoicePDF(invoiceData, outputPath) {
+    const saleDate = new Date(invoiceData.saleDate).toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true, // Set to false if you prefer 24-hour format
+    });
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument();
       const stream = fs.createWriteStream(outputPath);
@@ -199,7 +209,7 @@ async function generateInvoiceNumber() {
       doc.fontSize(20).text("Invoice", { align: "center" }).moveDown();
       doc.fontSize(14).text(`Invoice Number: ${invoiceData.invoiceNumber}`);
       doc.fontSize(14).text(`Customer Name: ${invoiceData.customerName}`);
-      doc.fontSize(14).text(`Sale Date: ${new Date(invoiceData.saleDate).toLocaleDateString()}`).moveDown();
+      doc.fontSize(14).text(`Sale Date: ${saleDate}`).moveDown();
       doc.fontSize(12).text(`Item: ${invoiceData.itemId.itemName}`);
       doc.fontSize(12).text(`Quantity: ${invoiceData.quantity}`);
       doc.fontSize(12).text(`Price Per Unit: $${invoiceData.pricePerUnit}`);
