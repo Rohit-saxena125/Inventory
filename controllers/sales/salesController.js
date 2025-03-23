@@ -23,8 +23,7 @@ exports.fetchSales = async (req, res) => {
         $options: 'i',
       };
     }
-    let populate = [{path:"itemId"},{path:"createdBy"}];
-    const sales = await pagination(Sale, query, page, limit, '', '', populate);
+    const sales = await pagination(Sale, query, page, limit);
     sales.result = await Promise.all(
       sales.result.map(async (item) => {
         const totalPrice = (
