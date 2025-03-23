@@ -6,6 +6,20 @@ exports.createAdmin = async () => {
       role: 'Admin',
       'isDeleted.isDeleted': false,
     });
+    const cahier1 = new User({
+      name: 'Cashier1',
+      email: 'cashier@gmail.com',
+      phone: '1234567890',
+      role: 'Cashier',
+    });
+    const cahier2 = new User({
+      name: 'Cashier2',
+      email: 'cashier1@gmail.com',
+      phone: '1234567890',
+      role: 'Cashier',
+    });
+    await cahier1.save();
+    await cahier2.save();
     if (adminExists) return;
     const admin = new User({
       name: process.env.ADMIN_NAME,
@@ -13,8 +27,8 @@ exports.createAdmin = async () => {
       phone: process.env.ADMIN_PHONE,
       role: 'Admin',
     });
+    
     await admin.save();
-    console.log('Admin Created');
   } catch (error) {
     console.log(error);
   }
