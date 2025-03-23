@@ -9,6 +9,7 @@ const { pagination } = require('../../utils/pagination');
 const PDFDocument = require('pdfkit');
 const {misData} = require("../../middlewares/upload/upload")
 const fs = require('fs');
+const path = require('path');
 exports.fetchSales = async (req, res) => {
   try {
     const { page, limit, search, itemId } = req.query;
