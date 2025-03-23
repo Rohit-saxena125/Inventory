@@ -4,7 +4,6 @@ exports.createAdmin = async () => {
   try {
     const adminExists = await User.findOne({
       role: 'Admin',
-      'isDeleted.isDeleted': false,
     });
     if (adminExists) return;
     const admin = new User({
@@ -28,6 +27,7 @@ exports.createAdmin = async () => {
     await cahier1.save();
     await cahier2.save();
     await admin.save();
+    console.log('Admin created');
   } catch (error) {
     console.log(error);
   }
