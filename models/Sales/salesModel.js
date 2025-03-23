@@ -46,6 +46,10 @@ const salesSchema = new mongoose.Schema({
     minQty:{
         type:String
     },
+    createdBy:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"User"
+    },
     isDeleted:{
         type: Boolean,
         default: false,

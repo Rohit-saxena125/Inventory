@@ -7,6 +7,7 @@ const {
 } = require('../../utils/customResponse');
 const { pagination } = require('../../utils/pagination');
 const PDFDocument = require('pdfkit');
+const {misData} = require("../../middlewares/upload/upload")
 const fs = require('fs');
 exports.fetchSales = async (req, res) => {
   try {
@@ -80,8 +81,9 @@ exports.createSales = async (req, res) => {
       discount,
       totalAmount,
       invoiceNumber,
+      createdBy: req.user._id,
     });
-    const sale = await Sale.findById({_id:sales._id}).populate({ path: 'itemId' });
+    const sale = await Sale.findById({_id:sales._id}).populate({ path: 'itemId' }).populate({ path: 'createdBy' });
     return successResponse(res, 'Sales created successfully', sale);
   } catch (error) {
     return internalServerErrorResponse(res, error);
@@ -152,21 +154,16 @@ exports.deleteSales = async (req, res) => {
 exports.downloadInvoice = async(req,res) => {
   try {
     const { id } = req.params;
-    const sales = await Sale.findById(id).populate('itemId');
+    const sales = await Sale.findById(id).populate('itemId').populate('createdBy');
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
-    if(sales.orderType === 'Sales'){
-      const outputPath = `invoice-${sales.invoiceNumber}.pdf`;
-    await createInvoicePDF(sales, outputPath);
-    res.download(outputPath, `invoice-${sales.invoiceNumber}.pdf`, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        res.status(500).send('Could not download the file.');
-      }
-    });
+    if (sales.orderType === "Sales") {
+      const outputPath = path.join(__dirname, `invoice-${sales.invoiceNumber}.pdf`);
+      await createInvoicePDF(sales, outputPath);
+      const s3Url = await misData(outputPath);
+      return successResponse(res, 'Invoice downloaded successfully', s3Url);
     }
-    return successResponse(res, 'Invoice downloaded successfully');
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
@@ -192,33 +189,27 @@ async function generateInvoiceNumber() {
     await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumber } }, { upsert: true });
   }
 
-
-
-async function createInvoicePDF(invoiceData, outputPath) {
-  const doc = new PDFDocument();
-  const stream = fs.createWriteStream(outputPath);
-  doc.pipe(stream);
-  doc.fontSize(20).text('Invoice', { align: 'center' });
-  doc.moveDown();
-
-  doc.fontSize(14).text(`Invoice Number: ${invoiceData.invoiceNumber}`);
-  doc.fontSize(14).text(`Customer Name: ${invoiceData.customerName}`);
-  doc.fontSize(14).text(`Sale Date: ${new Date(invoiceData.saleDate).toLocaleDateString()}`);
-  doc.moveDown();
-
-  doc.fontSize(12).text(`Item: ${invoiceData.itemId.itemName}`);
-  doc.fontSize(12).text(`Quantity: ${invoiceData.quantity}`);
-  doc.fontSize(12).text(`Price Per Unit: $${invoiceData.pricePerUnit}`);
-  doc.fontSize(12).text(`Discount: $${invoiceData.discount}`);
-  doc.fontSize(12).text(`Total Amount: $${invoiceData.totalAmount}`);
-  doc.moveDown();
-
-  doc.fontSize(12).text(`Description: ${invoiceData.description}`);
-
-  doc.end();
-
-  return new Promise((resolve, reject) => {
-    stream.on('finish', () => resolve(outputPath));
-    stream.on('error', reject);
-  });
-}
+  async function createInvoicePDF(invoiceData, outputPath) {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument();
+      const stream = fs.createWriteStream(outputPath);
+  
+      doc.pipe(stream);
+      doc.fontSize(20).text("Invoice", { align: "center" }).moveDown();
+      doc.fontSize(14).text(`Invoice Number: ${invoiceData.invoiceNumber}`);
+      doc.fontSize(14).text(`Customer Name: ${invoiceData.customerName}`);
+      doc.fontSize(14).text(`Sale Date: ${new Date(invoiceData.saleDate).toLocaleDateString()}`).moveDown();
+      doc.fontSize(12).text(`Item: ${invoiceData.itemId.itemName}`);
+      doc.fontSize(12).text(`Quantity: ${invoiceData.quantity}`);
+      doc.fontSize(12).text(`Price Per Unit: $${invoiceData.pricePerUnit}`);
+      doc.fontSize(12).text(`Discount: $${invoiceData.discount}`);
+      doc.fontSize(12).text(`Total Amount: $${invoiceData.totalAmount}`).moveDown();
+      doc.fontSize(12).text(`Description: ${invoiceData.description}`);
+      doc.fontSize(12).text(`Created By: ${invoiceData.createdBy.name}`).moveDown();
+      doc.end();
+  
+      stream.on("finish", () => resolve(outputPath));
+      stream.on("error", reject);
+    });
+  }
+  
