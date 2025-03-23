@@ -1,6 +1,12 @@
 const otpGenerator = require('otp-generator');
 const nodemailer = require('nodemailer');
-
+const path = require("path");
+const fs = require("fs");
+const imagePath = path.join(__dirname, "email.jpg");
+if (!fs.existsSync(imagePath)) {
+  console.error("Error: email.jpg not found at", imagePath);
+  process.exit(1);
+}
 exports.generateCode = (digit, option = { specialChars: false }) => {
   return otpGenerator.generate(digit, option);
 };
@@ -29,7 +35,7 @@ exports.sendEmail = async (mailAlert) => {
       attachments: [
         {
           filename: "email.jpg",
-          path: "../email.jpg",
+          path: imagePath,
           cid: "logo",
         },
       ],
