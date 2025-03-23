@@ -14,6 +14,7 @@ const s3Client = new S3Client({
 
 exports.misData = async (filePath)=>{
     const fileContent = fs.readFileSync(filePath);
+    const fileType = path.extname(filePath).toLowerCase();
     const contentType = fileType === ".pdf" ? "application/pdf" : "text/csv";
     const params = {
       Bucket: process.env.Bucket_Name,
