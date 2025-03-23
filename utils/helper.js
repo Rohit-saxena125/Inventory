@@ -26,6 +26,13 @@ exports.sendEmail = async (mailAlert) => {
       to: process.env.EMAIL_SENDER,
       subject: mailAlert.subject,
       html: mailAlert.message,
+      attachments: [
+        {
+          filename: "email.jpg",
+          path: "../email.jpg",
+          cid: "logo",
+        },
+      ],
     };
     transporter.sendMail(mailOptions, function (error, info) {
       if (error) {
@@ -82,7 +89,7 @@ exports.htmlMail = (data) => {
 <body>
     <div class="container">
         <div class="logo">
-            <img src="YOUR_LOGO_URL" alt="Company Logo">
+            <img src="cid:logo" width="150" alt="Company Logo">
         </div>
         <h2>OTP Verification</h2>
         <p>${data.name} One-Time Password (OTP) for verification is:</p>
