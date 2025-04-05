@@ -175,7 +175,7 @@ exports.deleteInventory = async (req, res, next) => {
 
 exports.reportInventory = async (req, res, next) => {
   try {
-    const [noOFItems, totalStockValue,lowStockItems] = await Promise.all([
+    const [noOFItems, totalStockValue, allInventoryItems] = await Promise.all([
       Inventory.countDocuments({}),
       Inventory.aggregate([
         {
@@ -196,26 +196,47 @@ exports.reportInventory = async (req, res, next) => {
               $sum: {
                 $multiply: [
                   { $toDouble: '$sales.quantity' },
-                  { $toDouble: '$sales.pricePerUnit' }
-                ]
-              }
-            }
-          }
-        }
+                  { $toDouble: '$sales.pricePerUnit' },
+                ],
+              },
+            },
+          },
+        },
       ]),
-      Inventory.find()
+      Inventory.find(),
     ]);
+
     const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
-    const lowStock = lowStockItems.filter((item) => {
-      const sales = item.sales.filter((sale) => sale.orderType === 'Opening' || sale.orderType === 'Add');
-      let quantity = 0;
-      sales.forEach((sale) => {
-        quantity += parseInt(sale.quantity, 10);
-      });
-      return quantity == 0;
-    });
-    const lowStockCount = lowStock.length;
+
+    // Check which inventory items are low in stock (i.e., net quantity is 0)
+    const lowStockChecks = await Promise.all(
+      allInventoryItems.map(async (item) => {
+        const sales = await Sale.find({ itemId: item._id });
+        let quantity = 0;
+
+        sales.forEach((sale) => {
+          const qty = parseInt(sale.quantity, 10) || 0;
+          if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
+            quantity += qty;
+          } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
+            quantity -= qty;
+          }
+        });
+
+        return {
+          item,
+          isLowStock: quantity === 0,
+        };
+      })
+    );
+
+    const lowStockItems = lowStockChecks
+      .filter((check) => check.isLowStock)
+      .map((check) => check.item);
+
+    const lowStockCount = lowStockItems.length;
     const noOFItemsValue = noOFItems > 0 ? noOFItems : 0;
+
     return successResponse(res, 'Inventory report fetched successfully', {
       noOFItems: noOFItemsValue,
       totalStockValue: totalValue,
@@ -224,7 +245,7 @@ exports.reportInventory = async (req, res, next) => {
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
-}
+};
 
 exports.addReduceInventory = async (req, res, next) => {
   try {
