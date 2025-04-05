@@ -36,7 +36,7 @@ exports.fetchSales = async (req, res) => {
       };
     }
     const populate = [
-      {path: 'itemId'},
+      {path: 'itemId',select: 'itemName'},
     ]
     const sales = await pagination(Sale, query, page, limit,null,null,populate);
     sales.result = await Promise.all(
