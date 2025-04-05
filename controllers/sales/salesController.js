@@ -339,7 +339,7 @@ function getValueByHeader(sale, header) {
     case 'quantity': return sale.quantity || 0;
     case 'pricePerUnit': return sale.pricePerUnit || 0;
     case 'stock value': return ((sale.pricePerUnit || 0) * (sale.quantity || 0)).toFixed(2);
-    case 'salesPrice': return sale.itemId?.salesPrice || '-';
+    case 'salesPrice': return sale.itemId?.salePrice || '-';
     case 'purchasePrice': return sale.itemId?.purchasePrice || '-';
     default: return '';
   }
