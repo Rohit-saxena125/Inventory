@@ -283,50 +283,65 @@ async function generateInvoiceNumber() {
       return internalServerErrorResponse(res, error);
     }
   };
+  const DEFAULT_HEADERS = [
+    'saleDate',
+    'itemId',
+    'quantity',
+    'pricePerUnit',
+    'stock value',
+    'salesPrice',
+    'purchasePrice',
+  ];
   
   // PDF Generator
-  async function createSalesReportPDF(salesData, headers, outputPath) {
-    return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 30 });
-      const stream = fs.createWriteStream(outputPath);
-      doc.pipe(stream);
-  
-      doc.fontSize(18).text('Sales Report', { align: 'center' }).moveDown();
-  
-      salesData.forEach((sale) => {
-        headers.forEach((header) => {
-          let value = getValueByHeader(sale, header);
-          doc.fontSize(12).text(`${header}: ${value}`);
-        });
-        doc.moveDown();
+async function createSalesReportPDF(salesData, headers, outputPath) {
+  if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 30 });
+    const stream = fs.createWriteStream(outputPath);
+    doc.pipe(stream);
+
+    doc.fontSize(18).text('Sales Report', { align: 'center' }).moveDown();
+
+    salesData.forEach((sale) => {
+      headers.forEach((header) => {
+        let value = getValueByHeader(sale, header);
+        doc.fontSize(12).text(`${header}: ${value}`);
       });
-  
-      doc.end();
-      stream.on('finish', () => resolve(outputPath));
-      stream.on('error', reject);
+      doc.moveDown();
     });
+
+    doc.end();
+    stream.on('finish', () => resolve(outputPath));
+    stream.on('error', reject);
+  });
+}
+
+// CSV Generator
+async function createSalesReportCSV(salesData, headers, outputPath) {
+  if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
+
+  const rows = salesData.map((sale) => {
+    return headers.map(header => `"${getValueByHeader(sale, header)}"`).join(',');
+  });
+  const csvContent = [headers.join(','), ...rows].join('\n');
+  fs.writeFileSync(outputPath, csvContent);
+}
+
+// Helper to resolve field values
+function getValueByHeader(sale, header) {
+  switch (header) {
+    case 'saleDate': return sale.saleDate
+      ? moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
+      : '-';
+    case 'itemId': return sale.itemId?.itemName || '-';
+    case 'quantity': return sale.quantity || 0;
+    case 'pricePerUnit': return sale.pricePerUnit || 0;
+    case 'stock value': return ((sale.pricePerUnit || 0) * (sale.quantity || 0)).toFixed(2);
+    case 'salesPrice': return sale.itemId?.salesPrice || '-';
+    case 'purchasePrice': return sale.itemId?.purchasePrice || '-';
+    default: return '';
   }
-  
-  // CSV Generator
-  async function createSalesReportCSV(salesData, headers, outputPath) {
-    const rows = salesData.map((sale) => {
-      return headers.map(header => `"${getValueByHeader(sale, header)}"`).join(',');
-    });
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    fs.writeFileSync(outputPath, csvContent);
-  }
-  
-  // Helper to resolve field values
-  function getValueByHeader(sale, header) {
-    switch (header) {
-      case 'saleDate': return moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A');
-      case 'itemId': return sale.itemId?.itemName || '-';
-      case 'quantity': return sale.quantity;
-      case 'stock value': return sale.pricePerUnit * sale.quantity;
-      case 'pricePerUnit': return sale.pricePerUnit;
-      case 'salesPrice' : return sale.itemId?.salesPrice || '-';
-      case 'purchasePrice' : return sale.itemId?.purchasePrice || '-';
-      default: return '';
-    }
-  }
+}
   
