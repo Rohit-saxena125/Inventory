@@ -265,7 +265,7 @@ async function generateInvoiceNumber() {
       }
   
       const fileName = `sales-report-${Date.now()}.${format}`;
-      const outputPath = path.join(__dirname, '../../temp/', fileName);
+      const outputPath = path.join(__dirname,fileName);
   
       if (format === 'pdf') {
         await createSalesReportPDF(sales, headers, outputPath);
