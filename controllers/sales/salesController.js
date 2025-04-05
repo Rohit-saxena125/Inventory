@@ -11,6 +11,7 @@ const {misData} = require("../../middlewares/upload/upload")
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
+
 exports.fetchSales = async (req, res) => {
   try {
     const { page, limit, search, itemId,startDate,endDate,userId } = req.query;
@@ -40,6 +41,9 @@ exports.fetchSales = async (req, res) => {
         const totalPrice = (
           parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
         ).toFixed(2);
+        if (item.discount === '') {
+          item.discount = 0;
+        }
         return {
           ...item.toObject(),
           totalPrice: totalPrice - parseFloat(item.discount),
