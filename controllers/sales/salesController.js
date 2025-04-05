@@ -247,8 +247,6 @@ async function generateInvoiceNumber() {
     try {
       const { format = 'pdf', headers = [], startDate, endDate, userId, search } = req.body;
       const query = { isDeleted: false };
-  
-      if (itemId) query.itemId = itemId;
       if (userId) query.createdBy = userId;
       if (startDate && endDate) {
         query.saleDate = {
@@ -321,16 +319,13 @@ async function generateInvoiceNumber() {
   // Helper to resolve field values
   function getValueByHeader(sale, header) {
     switch (header) {
-      case 'invoiceNumber': return sale.invoiceNumber;
-      case 'customerName': return sale.customerName;
       case 'saleDate': return moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A');
       case 'itemId': return sale.itemId?.itemName || '-';
       case 'quantity': return sale.quantity;
+      case 'stock value': return sale.pricePerUnit * sale.quantity;
       case 'pricePerUnit': return sale.pricePerUnit;
-      case 'discount': return sale.discount || 0;
-      case 'totalAmount': return sale.totalAmount;
-      case 'orderType': return sale.orderType;
-      case 'createdBy': return sale.createdBy?.name || '-';
+      case 'salesPrice' : return sale.itemId?.salesPrice || '-';
+      case 'purchasePrice' : return sale.itemId?.purchasePrice || '-';
       default: return '';
     }
   }
