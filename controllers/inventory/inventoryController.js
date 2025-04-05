@@ -63,7 +63,7 @@ exports.getAllInventory = async (req, res, next) => {
         sales.forEach((sale) => {
           if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
             quantity += parseInt(sale.quantity, 10);
-          } else if (sale.orderType === 'Sale' || sale.orderType === 'Reduce') {
+          } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
             quantity -= parseInt(sale.quantity, 10);
           }
         });
@@ -101,7 +101,7 @@ exports.getInventoryById = async (req, res, next) => {
       if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
         inventory.quantity += quantity;
         inventory.stockValue += quantity * pricePerUnit;
-      } else if (sale.orderType === 'Sale' || sale.orderType === 'Reduce') {
+      } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
         inventory.quantity -= quantity;
       }
     });
