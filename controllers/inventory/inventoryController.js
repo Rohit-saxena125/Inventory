@@ -203,15 +203,23 @@ exports.reportInventory = async (req, res, next) => {
           }
         }
       ]),
-      Inventory.find({ minStockQty: { $eq: 0 } }).countDocuments({}),
+      Inventory.find()
     ]);
     const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
-    const lowStock = lowStockItems;
+    const lowStock = lowStockItems.filter((item) => {
+      const sales = item.sales.filter((sale) => sale.orderType === 'Opening' || sale.orderType === 'Add');
+      let quantity = 0;
+      sales.forEach((sale) => {
+        quantity += parseInt(sale.quantity, 10);
+      });
+      return quantity == 0;
+    });
+    const lowStockCount = lowStock.length;
     const noOFItemsValue = noOFItems > 0 ? noOFItems : 0;
     return successResponse(res, 'Inventory report fetched successfully', {
       noOFItems: noOFItemsValue,
       totalStockValue: totalValue,
-      lowStockItems: lowStock,
+      lowStockItems: lowStockCount,
     });
   } catch (error) {
     return internalServerErrorResponse(res, error);
