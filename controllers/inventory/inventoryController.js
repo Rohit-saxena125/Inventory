@@ -206,7 +206,7 @@ exports.reportInventory = async (req, res, next) => {
       Inventory.find({ minStockQty: { $eq: 0 } })
     ]);
     const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
-    const lowStock = lowStockItems.length > 0 ? lowStockItems : [];
+    const lowStock = lowStockItems;
     const noOFItemsValue = noOFItems > 0 ? noOFItems : 0;
     return successResponse(res, 'Inventory report fetched successfully', {
       noOFItems: noOFItemsValue,
