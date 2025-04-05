@@ -10,12 +10,23 @@ const PDFDocument = require('pdfkit');
 const {misData} = require("../../middlewares/upload/upload")
 const fs = require('fs');
 const path = require('path');
+const moment = require('moment-timezone');
 exports.fetchSales = async (req, res) => {
   try {
-    const { page, limit, search, itemId } = req.query;
+    const { page, limit, search, itemId,startDate,endDate,userId } = req.query;
     const query = {isDeleted:false};
     if (itemId) {
       query.itemId = itemId;
+    }
+    if (userId) {
+      query.createdBy = userId;
+    }
+    if (startDate && endDate) {
+      query.saleDate = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').utc().toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').utc().toDate(),
+       
+      };
     }
     if (search) {
       query.orderType = {
@@ -31,7 +42,7 @@ exports.fetchSales = async (req, res) => {
         ).toFixed(2);
         return {
           ...item.toObject(),
-          totalPrice: totalPrice-parseFloat(item.discount),
+          totalPrice: totalPrice - parseFloat(item.discount),
         };
       })
     );
