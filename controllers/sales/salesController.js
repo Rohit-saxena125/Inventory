@@ -217,7 +217,7 @@ async function generateInvoiceNumber() {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-      hour12: true, // Set to false if you prefer 24-hour format
+      hour12: true, 
     });
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument();
@@ -230,9 +230,9 @@ async function generateInvoiceNumber() {
       doc.fontSize(14).text(`Sale Date: ${saleDate}`).moveDown();
       doc.fontSize(12).text(`Item: ${invoiceData.itemId.itemName}`);
       doc.fontSize(12).text(`Quantity: ${invoiceData.quantity}`);
-      doc.fontSize(12).text(`Price Per Unit: $${invoiceData.pricePerUnit}`);
-      doc.fontSize(12).text(`Discount: $${invoiceData.discount}`);
-      doc.fontSize(12).text(`Total Amount: $${invoiceData.totalAmount}`).moveDown();
+      doc.fontSize(12).text(`Price Per Unit: ₹${invoiceData.pricePerUnit}`);
+      doc.fontSize(12).text(`Discount: ₹${invoiceData.discount}`);
+      doc.fontSize(12).text(`Total Amount: ₹${invoiceData.totalAmount}`).moveDown();
       doc.fontSize(12).text(`Description: ${invoiceData.description}`);
       doc.fontSize(12).text(`Created By: ${invoiceData.createdBy.name}`).moveDown();
       doc.end();
@@ -240,5 +240,98 @@ async function generateInvoiceNumber() {
       stream.on("finish", () => resolve(outputPath));
       stream.on("error", reject);
     });
+  }
+  
+
+  exports.downloadSalesReport = async (req, res) => {
+    try {
+      const { format = 'pdf', headers = [], startDate, endDate, userId, search } = req.body;
+      const query = { isDeleted: false };
+  
+      if (itemId) query.itemId = itemId;
+      if (userId) query.createdBy = userId;
+      if (startDate && endDate) {
+        query.saleDate = {
+          $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+          $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate()
+        };
+      }
+      if (search) {
+        query.orderType = { $regex: search, $options: 'i' };
+      }
+  
+      const sales = await Sale.find(query).populate('itemId').populate('createdBy');
+  
+      if (!sales || sales.length === 0) {
+        return badRequestErrorResponse(res, 'No sales data found for the given filters.');
+      }
+  
+      const fileName = `sales-report-${Date.now()}.${format}`;
+      const outputPath = path.join(__dirname, '../../temp/', fileName);
+  
+      if (format === 'pdf') {
+        await createSalesReportPDF(sales, headers, outputPath);
+      } else if (format === 'csv') {
+        await createSalesReportCSV(sales, headers, outputPath);
+      } else {
+        return badRequestErrorResponse(res, 'Invalid format. Use "pdf" or "csv".');
+      }
+  
+      const s3Url = await misData(outputPath);
+      fs.unlinkSync(outputPath); // Clean up temp file
+  
+      return successResponse(res, 'Sales report downloaded successfully', s3Url);
+    } catch (error) {
+      return internalServerErrorResponse(res, error);
+    }
+  };
+  
+  // PDF Generator
+  async function createSalesReportPDF(salesData, headers, outputPath) {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 30 });
+      const stream = fs.createWriteStream(outputPath);
+      doc.pipe(stream);
+  
+      doc.fontSize(18).text('Sales Report', { align: 'center' }).moveDown();
+  
+      salesData.forEach((sale) => {
+        headers.forEach((header) => {
+          let value = getValueByHeader(sale, header);
+          doc.fontSize(12).text(`${header}: ${value}`);
+        });
+        doc.moveDown();
+      });
+  
+      doc.end();
+      stream.on('finish', () => resolve(outputPath));
+      stream.on('error', reject);
+    });
+  }
+  
+  // CSV Generator
+  async function createSalesReportCSV(salesData, headers, outputPath) {
+    const rows = salesData.map((sale) => {
+      return headers.map(header => `"${getValueByHeader(sale, header)}"`).join(',');
+    });
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    fs.writeFileSync(outputPath, csvContent);
+  }
+  
+  // Helper to resolve field values
+  function getValueByHeader(sale, header) {
+    switch (header) {
+      case 'invoiceNumber': return sale.invoiceNumber;
+      case 'customerName': return sale.customerName;
+      case 'saleDate': return moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A');
+      case 'itemId': return sale.itemId?.itemName || '-';
+      case 'quantity': return sale.quantity;
+      case 'pricePerUnit': return sale.pricePerUnit;
+      case 'discount': return sale.discount || 0;
+      case 'totalAmount': return sale.totalAmount;
+      case 'orderType': return sale.orderType;
+      case 'createdBy': return sale.createdBy?.name || '-';
+      default: return '';
+    }
   }
   
