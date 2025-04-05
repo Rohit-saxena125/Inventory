@@ -172,7 +172,7 @@ exports.downloadInvoice = async(req,res) => {
 
 exports.deleteSalesAll = async (req, res) => {
   try {
-    await Sale.deleteMany({});
+    await Sale.deleteMany({orderType:"Sales"});
     return successResponse(res, 'All Sales deleted successfully ');
   } catch (error) {
     return internalServerErrorResponse(res, error);
