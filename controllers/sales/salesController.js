@@ -35,7 +35,10 @@ exports.fetchSales = async (req, res) => {
         $options: 'i',
       };
     }
-    const sales = await pagination(Sale, query, page, limit,null,null,[{"itemId"}]);
+    const populate = [
+      {path: 'itemId'},
+    ]
+    const sales = await pagination(Sale, query, page, limit,null,null,populate);
     sales.result = await Promise.all(
       sales.result.map(async (item) => {
         const totalPrice = (

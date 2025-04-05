@@ -192,9 +192,16 @@ exports.reportInventory = async (req, res, next) => {
         {
           $group: {
             _id: null,
-            totalStockValue: { $sum: { $multiply: ['$sales.quantity', '$sales.pricePerUnit'] } },
-          },
-        },
+            totalStockValue: {
+              $sum: {
+                $multiply: [
+                  { $toDouble: '$sales.quantity' },
+                  { $toDouble: '$sales.pricePerUnit' }
+                ]
+              }
+            }
+          }
+        }
       ]),
       Inventory.find({ minStockQty: { $eq: 0 } })
     ]);
