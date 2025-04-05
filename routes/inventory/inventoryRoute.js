@@ -8,5 +8,6 @@ router.get('/fetch/:id',tokenVerify,checkRole(['Admin']),inventoryController.get
 router.patch('/update/:id',tokenVerify,checkRole(['Admin']),inventoryController.updateInventory);
 router.patch('/delete/:id',tokenVerify,checkRole(['Admin']),inventoryController.deleteInventory);
 router.patch('/updateStock/:id',tokenVerify,checkRole(['Admin']),inventoryController.addReduceInventory);
+router.get('/reportInventory',tokenVerify,checkRole(['Admin']),inventoryController.reportInventory);
 
 module.exports = router;

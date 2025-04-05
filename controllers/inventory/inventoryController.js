@@ -173,6 +173,44 @@ exports.deleteInventory = async (req, res, next) => {
   }
 };
 
+exports.reportInventory = async (req, res, next) => {
+  try {
+    const [noOFItems, totalStockValue,lowStockItems] = await Promise.all([
+      Inventory.countDocuments({}),
+      Inventory.aggregate([
+        {
+          $lookup: {
+            from: 'sales',
+            localField: '_id',
+            foreignField: 'itemId',
+            as: 'sales',
+          },
+        },
+        {
+          $unwind: '$sales',
+        },
+        {
+          $group: {
+            _id: null,
+            totalStockValue: { $sum: { $multiply: ['$sales.quantity', '$sales.pricePerUnit'] } },
+          },
+        },
+      ]),
+      Inventory.find({ minStockQty: { $eq: 0 } })
+    ]);
+    const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
+    const lowStock = lowStockItems.length > 0 ? lowStockItems : [];
+    const noOFItemsValue = noOFItems > 0 ? noOFItems : 0;
+    return successResponse(res, 'Inventory report fetched successfully', {
+      noOFItems: noOFItemsValue,
+      totalStockValue: totalValue,
+      lowStockItems: lowStock,
+    });
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
+
 exports.addReduceInventory = async (req, res, next) => {
   try {
     const type = req.query.type;
