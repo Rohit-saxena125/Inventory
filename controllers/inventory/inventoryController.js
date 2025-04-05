@@ -203,7 +203,7 @@ exports.reportInventory = async (req, res, next) => {
           }
         }
       ]),
-      Inventory.find({ minStockQty: { $eq: 0 } })
+      Inventory.find({ minStockQty: { $eq: 0 } }).countDocuments({}),
     ]);
     const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
     const lowStock = lowStockItems;
