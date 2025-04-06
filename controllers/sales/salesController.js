@@ -112,7 +112,7 @@ exports.createSales = async (req, res) => {
 exports.createFinalSales = async (req, res) => {
   try {
     const { listSales } = req.body;
-    const invoiceNumber = req.queryinvoiceNumber;
+    const invoiceNumber = req.query.invoiceNumber;
 
     await updateInvoiceNumber(invoiceNumber);
 
