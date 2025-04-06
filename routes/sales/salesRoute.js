@@ -7,7 +7,7 @@ router.get('/fetchSales/:id', tokenVerify, checkRole(['Admin']), salesController
 router.post('/createSales', tokenVerify, checkRole(['Admin','Cashier']), salesController.createSales);
 router.patch('/updateSales/:id', tokenVerify, checkRole(['Admin']), salesController.updateSales);
 router.patch('/deleteSales/:id', tokenVerify, checkRole(['Admin']), salesController.deleteSales);
-router.get('/fetchSalesInvoice', tokenVerify, checkRole(['Admin','Cashier']), salesController.downloadInvoice);
+router.post('/fetchSalesInvoice', tokenVerify, checkRole(['Admin','Cashier']), salesController.downloadInvoice);
 router.delete('/deleteSales', tokenVerify, checkRole(['Admin']), salesController.deleteSalesAll);
 router.post('/fetchSalesReport', tokenVerify, checkRole(['Admin']), salesController.downloadSalesReport);
 router.get('/fetchInvoiceNumber', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchInvoiceNumber);
