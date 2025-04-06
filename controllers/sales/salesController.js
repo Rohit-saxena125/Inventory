@@ -119,7 +119,7 @@ exports.createFinalSales = async (req, res) => {
     const sales = [];
 
     for (const item of listSales) {
-      const dummySales = await SaleDummy.findById(item._id);
+      const dummySales = await SaleDummy.findOne({_id:item});
       if (!dummySales) {
         return badRequestErrorResponse(res, 'Sales not found');
       }
