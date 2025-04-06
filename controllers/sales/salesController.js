@@ -113,7 +113,7 @@ exports.createSales = async (req, res) => {
 exports.fetchDummySales = async (req, res) => {
   try {
     const {invoiceNumber} = req.query;
-    const sales = await SaleDummy.find({invoiceNumber:invoiceNumber}).populate('itemId').populate('createdBy');
+    let sales = await SaleDummy.find({invoiceNumber:invoiceNumber}).populate('itemId').populate('createdBy');
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
