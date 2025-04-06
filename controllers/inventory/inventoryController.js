@@ -69,7 +69,7 @@ exports.getAllInventory = async (req, res, next) => {
         });
         return {
           ...item.toObject(),
-          quantity: quantity,
+          quantity: quantity>0 ? quantity : 0,
         };
       })
     );
@@ -105,7 +105,8 @@ exports.getInventoryById = async (req, res, next) => {
         inventory.quantity -= quantity;
       }
     });
-    inventory.stockValue = inventory.stockValue.toFixed(2);
+    inventory.stockValue = inventory.stockValue.toFixed(2)>0? inventory.stockValue.toFixed(2) : 0;
+    inventory.quantity = inventory.quantity>0 ? inventory.quantity : 0;
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
     return internalServerErrorResponse(res, error);
