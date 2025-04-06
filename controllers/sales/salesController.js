@@ -89,7 +89,7 @@ exports.createSales = async (req, res) => {
       totalAmount,
       invoiceNumber
     } = req.body;
-    await updateInvoiceNumber(invoiceNumber);
+    // await updateInvoiceNumber(invoiceNumber);
     let sales = await SaleDummy.create({
       orderType: 'Sales',
       quantity,
