@@ -117,7 +117,22 @@ exports.fetchDummySales = async (req, res) => {
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
-    return successResponse(res, 'Sales fetched successfully', sales);
+    let totalBill = 0;
+    sales =  await Promise.all(
+      sales.map(async (item) => {
+        const totalPrice = (
+          parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
+        ).toFixed(2);
+        if (item.discount === '') {
+          item.discount = 0;
+        }
+        totalBill = totalBill + (totalPrice - parseFloat(item.discount));
+        return {
+          ...item.toObject(),
+          totalPrice: totalPrice - parseFloat(item.discount),
+        };
+      }))
+    return successResponse(res, 'Sales fetched successfully', {sales,totalBill});
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
