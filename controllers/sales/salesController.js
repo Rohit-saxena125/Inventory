@@ -95,7 +95,7 @@ exports.createSales = async (req, res) => {
       quantity,
       pricePerUnit,
       description,
-      saleDate,
+      saleDate: new Date(saleDate),
       itemId,
       customerName,
       discount,
@@ -128,7 +128,7 @@ exports.createFinalSales = async (req, res) => {
         quantity: dummySales.quantity,
         pricePerUnit: dummySales.pricePerUnit,
         description: dummySales.description,
-        saleDate: dummySales.saleDate,
+        saleDate: new Date(dummySales.saleDate),
         itemId: dummySales.itemId,
         customerName: dummySales.customerName,
         discount: dummySales.discount,
@@ -203,7 +203,7 @@ exports.updateSales = async (req, res) => {
           quantity,
           pricePerUnit,
           description,
-          saleDate,
+          saleDate: new Date(saleDate),
           itemId,
           customerName,
           discount,
@@ -237,19 +237,27 @@ exports.deleteSales = async (req, res) => {
   }
 };
 
-exports.downloadInvoice = async(req,res) => {
+exports.downloadInvoice = async (req, res) => {
   try {
-    const { id } = req.params;
-    const sales = await Sale.findById(id).populate('itemId').populate('createdBy');
-    if (!sales) {
+    const { listSales } = req.body;
+
+    if (!listSales || !Array.isArray(listSales) || listSales.length === 0) {
+      return badRequestErrorResponse(res, 'No sales provided');
+    }
+    const salesData = await Sale.find({
+      _id: { $in: listSales }
+    }).populate('itemId').populate('createdBy');
+
+    if (!salesData || salesData.length === 0) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
-    if (sales.orderType === "Sales") {
-      const outputPath = path.join(__dirname, `invoice-${sales.invoiceNumber}.pdf`);
-      await createInvoicePDF(sales, outputPath);
-      const s3Url = await misData(outputPath);
-      return successResponse(res, 'Invoice downloaded successfully', s3Url);
-    }
+    const invoiceNumber = salesData[0].invoiceNumber;
+    const outputPath = path.join(__dirname, `invoice-${invoiceNumber}.pdf`);
+    await createInvoicePDF(salesData, outputPath);
+    const s3Url = await misData(outputPath);
+    fs.unlinkSync(outputPath);
+
+    return successResponse(res, 'Invoice downloaded successfully', s3Url);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
@@ -289,39 +297,47 @@ exports.fetchInvoiceNumber = async (req, res) => {
     await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumber } }, { upsert: true });
   }
 
-  async function createInvoicePDF(invoiceData, outputPath) {
-    const saleDate = new Date(invoiceData.saleDate).toLocaleString("en-US", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true, 
-    });
-    return new Promise((resolve, reject) => {
-      const doc = new PDFDocument();
-      const stream = fs.createWriteStream(outputPath);
   
-      doc.pipe(stream);
-      doc.fontSize(20).text("Invoice", { align: "center" }).moveDown();
-      doc.fontSize(14).text(`Invoice Number: ${invoiceData.invoiceNumber}`);
-      doc.fontSize(14).text(`Customer Name: ${invoiceData.customerName}`);
-      doc.fontSize(14).text(`Sale Date: ${saleDate}`).moveDown();
-      doc.fontSize(12).text(`Item: ${invoiceData.itemId.itemName}`);
-      doc.fontSize(12).text(`Quantity: ${invoiceData.quantity}`);
-      doc.fontSize(12).text(`Price Per Unit: ₹${invoiceData.pricePerUnit}`);
-      doc.fontSize(12).text(`Discount: ₹${invoiceData.discount}`);
-      doc.fontSize(12).text(`Total Amount: ₹${invoiceData.totalAmount}`).moveDown();
-      doc.fontSize(12).text(`Description: ${invoiceData.description}`);
-      doc.fontSize(12).text(`Created By: ${invoiceData.createdBy.name}`).moveDown();
-      doc.end();
-  
-      stream.on("finish", () => resolve(outputPath));
-      stream.on("error", reject);
+async function createInvoicePDF(invoiceDataArray, outputPath) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument();
+    const stream = fs.createWriteStream(outputPath);
+    doc.pipe(stream);
+    doc.fontSize(20).text("Combined Sales Invoice", { align: "center" }).moveDown();
+    invoiceDataArray.forEach((sale, index) => {
+      const saleDate = new Date(sale.saleDate).toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+      doc
+        .fontSize(16)
+        .text(`Sale #${index + 1}`, { underline: true })
+        .moveDown(0.5);
+      doc.fontSize(12).text(`Invoice Number: ${sale.invoiceNumber}`);
+      doc.fontSize(12).text(`Customer Name: ${sale.customerName}`);
+      doc.fontSize(12).text(`Sale Date: ${saleDate}`);
+      doc.fontSize(12).text(`Item: ${sale.itemId.itemName}`);
+      doc.fontSize(12).text(`Quantity: ${sale.quantity}`);
+      doc.fontSize(12).text(`Price Per Unit: ₹${sale.pricePerUnit}`);
+      doc.fontSize(12).text(`Discount: ₹${sale.discount}`);
+      doc.fontSize(12).text(`Total Amount: ₹${sale.totalAmount}`);
+      doc.fontSize(12).text(`Description: ${sale.description}`);
+      doc.fontSize(12).text(`Created By: ${sale.createdBy.name}`);
+      doc.moveDown(1);
     });
-  }
+
+    doc.end();
+
+    stream.on("finish", () => resolve(outputPath));
+    stream.on("error", reject);
+  });
+}
   
 
   exports.downloadSalesReport = async (req, res) => {
