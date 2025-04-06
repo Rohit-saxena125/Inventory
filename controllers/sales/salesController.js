@@ -1,4 +1,5 @@
 const Sale = require('../../models/Sales/salesModel');
+const SaleDummy = require('../../models/Sales/salesDummyModel')
 const InvoiceCounter = require('../../models/Sales/invoiceCounterModel');
 const {
   successResponse,
@@ -86,10 +87,10 @@ exports.createSales = async (req, res) => {
       customerName,
       discount,
       totalAmount,
+      invoiceNumber
     } = req.body;
-    let invoiceNumber = await generateInvoiceNumber();
     await updateInvoiceNumber(invoiceNumber);
-    let sales = await Sale.create({
+    let sales = await SaleDummy.create({
       orderType: 'Sales',
       quantity,
       pricePerUnit,
@@ -102,7 +103,7 @@ exports.createSales = async (req, res) => {
       invoiceNumber,
       createdBy: req.user._id,
     });
-    const sale = await Sale.findById({_id:sales._id}).populate({ path: 'itemId' }).populate({ path: 'createdBy' });
+    const sale = await SaleDummy.findById({_id:sales._id}).populate({ path: 'itemId' }).populate({ path: 'createdBy' });
     return successResponse(res, 'Sales created successfully', sale);
   } catch (error) {
     return internalServerErrorResponse(res, error);
