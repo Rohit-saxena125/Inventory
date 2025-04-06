@@ -11,4 +11,5 @@ router.get('/fetchSalesInvoice/:id', tokenVerify, checkRole(['Admin','Cashier'])
 router.delete('/deleteSales', tokenVerify, checkRole(['Admin']), salesController.deleteSalesAll);
 router.post('/fetchSalesReport', tokenVerify, checkRole(['Admin']), salesController.downloadSalesReport);
 router.get('/fetchInvoiceNumber', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchInvoiceNumber);
+router.get('/fetchSaleDummy', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchDummySales);
 module.exports = router;

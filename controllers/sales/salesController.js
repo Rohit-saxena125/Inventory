@@ -110,6 +110,19 @@ exports.createSales = async (req, res) => {
   }
 };
 
+exports.fetchDummySales = async (req, res) => {
+  try {
+    const {invoiceNumber} = req.query;
+    const sales = await SaleDummy.find({invoiceNumber:invoiceNumber}).populate('itemId').populate('createdBy');
+    if (!sales) {
+      return badRequestErrorResponse(res, 'Sales not found');
+    }
+    return successResponse(res, 'Sales fetched successfully', sales);
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
+
 exports.updateSales = async (req, res) => {
   try {
     const { id } = req.params;
@@ -215,6 +228,11 @@ exports.fetchInvoiceNumber = async (req, res) => {
 }
 
   async function updateInvoiceNumber(invoiceNumber) {
+    const isinvoiceNumber = await InvoiceCounter.findOne({invoiceNumber:invoiceNumber});
+    if (isinvoiceNumber) {
+      let invoiceNumbergen = await generateInvoiceNumber();
+      await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumbergen} }, { upsert: true });
+    }
     await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumber } }, { upsert: true });
   }
 
