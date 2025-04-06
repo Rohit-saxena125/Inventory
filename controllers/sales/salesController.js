@@ -110,6 +110,41 @@ exports.createSales = async (req, res) => {
   }
 };
 
+exports.createFinalSales = async (req, res) => {
+  try {
+    const {listSales} = req.body;
+    const invoiceNumber = listSales[0].invoiceNumber;
+    await updateInvoiceNumber(invoiceNumber);
+    let sales = await Promise.all(
+      listSales.map(async (item) => {
+        const dummySales = await SaleDummy.findById(item._id);
+        if (!dummySales) {
+          return badRequestErrorResponse(res, 'Sales not found');
+        }
+        const sales = await Sale.create({
+          orderType: 'Sales',
+          quantity: dummySales.quantity,
+          pricePerUnit: dummySales.pricePerUnit,
+          description: dummySales.description,
+          saleDate: dummySales.saleDate,
+          itemId: dummySales.itemId,
+          customerName: dummySales.customerName,
+          discount: dummySales.discount,
+          totalAmount: dummySales.totalAmount,
+          invoiceNumber: invoiceNumber,
+          createdBy: req.user._id,
+        });
+        await SaleDummy.findByIdAndUpdate(item._id, {isDeleted:true});
+        return sales;
+      })
+    )
+    return successResponse(res, 'Sales created successfully');
+  }
+  catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
+
 exports.fetchDummySales = async (req, res) => {
   try {
     const {invoiceNumber} = req.query;
