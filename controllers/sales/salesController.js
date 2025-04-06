@@ -109,6 +109,7 @@ exports.createSales = async (req, res) => {
     return internalServerErrorResponse(res, error);
   }
 };
+
 exports.createFinalSales = async (req, res) => {
   try {
     const { listSales } = req.body;
@@ -117,13 +118,11 @@ exports.createFinalSales = async (req, res) => {
     await updateInvoiceNumber(invoiceNumber);
 
     const sales = [];
-
     for (const item of listSales) {
       const dummySales = await SaleDummy.findOne({_id:item});
       if (!dummySales) {
         return badRequestErrorResponse(res, 'Sales not found');
       }
-
       const sale = await Sale.create({
         orderType: 'Sales',
         quantity: dummySales.quantity,
@@ -139,10 +138,10 @@ exports.createFinalSales = async (req, res) => {
       });
 
       await SaleDummy.findByIdAndDelete(item._id);
-      sales.push(sale);
+      sales.push(sale._id);
     }
 
-    return successResponse(res, 'Sales created successfully');
+    return successResponse(res, 'Sales created successfully',sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
