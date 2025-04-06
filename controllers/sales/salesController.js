@@ -134,7 +134,7 @@ exports.createFinalSales = async (req, res) => {
           invoiceNumber: invoiceNumber,
           createdBy: req.user._id,
         });
-        await SaleDummy.findByIdAndUpdate(item._id, {isDeleted:true});
+        await SaleDummy.findByIdAndDelete(item._id);
         return sales;
       })
     )
