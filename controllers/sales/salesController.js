@@ -204,6 +204,15 @@ async function generateInvoiceNumber() {
     return 1; 
   }
 
+exports.fetchInvoiceNumber = async (req, res) => {
+  try {
+    const invoice = await generateInvoiceNumber();
+    return successResponse(res, 'Invoice number fetched successfully', invoice);
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
+
   async function updateInvoiceNumber(invoiceNumber) {
     await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumber } }, { upsert: true });
   }

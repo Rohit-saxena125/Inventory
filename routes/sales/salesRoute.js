@@ -10,4 +10,5 @@ router.patch('/deleteSales/:id', tokenVerify, checkRole(['Admin']), salesControl
 router.get('/fetchSalesInvoice/:id', tokenVerify, checkRole(['Admin','Cashier']), salesController.downloadInvoice);
 router.delete('/deleteSales', tokenVerify, checkRole(['Admin']), salesController.deleteSalesAll);
 router.post('/fetchSalesReport', tokenVerify, checkRole(['Admin']), salesController.downloadSalesReport);
+router.get('/fetchInvoiceNumber', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchInvoiceNumber);
 module.exports = router;
