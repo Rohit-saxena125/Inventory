@@ -291,7 +291,7 @@ exports.downloadInvoice = async (req, res) => {
 
 exports.deleteSalesAll = async (req, res) => {
   try {
-    const {startDate, endDate,userId} = req.query;
+    const {startDate, endDate,userId,invoiceNumber} = req.query;
     const query = { isDeleted: false };
     if(startDate && endDate){
     query.createdAt= {
@@ -302,6 +302,9 @@ exports.deleteSalesAll = async (req, res) => {
     query.orderType = 'Sales';
     if (userId) {
       query.createdBy = userId;
+    }
+    if (invoiceNumber) {
+      query.invoiceNumber = invoiceNumber;
     }
     await Sale.updateMany(query,{ $set: { isDeleted: true } }, { new: true, runValidators: true });
     return successResponse(res, 'All Sales deleted successfully ');
