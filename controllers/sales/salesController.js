@@ -12,6 +12,7 @@ const { misData } = require('../../middlewares/upload/upload');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
+const { create } = require('../../models/inventory/inventoryModel');
 
 exports.fetchSales = async (req, res) => {
   try {
@@ -290,7 +291,15 @@ exports.downloadInvoice = async (req, res) => {
 
 exports.deleteSalesAll = async (req, res) => {
   try {
-    await Sale.deleteMany({ orderType: 'Sales' });
+    const {startDate, endDate,} = req.query;
+    const query = {
+      createdAt: {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+      },
+      orderType: 'Sales',
+    }
+    await Sale.deleteMany(query);
     return successResponse(res, 'All Sales deleted successfully ');
   } catch (error) {
     return internalServerErrorResponse(res, error);
