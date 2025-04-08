@@ -47,7 +47,7 @@ exports.createInventory = async (req, res, next) => {
 
 exports.getAllInventory = async (req, res, next) => {
   try {
-    const { page, limit, search,startDate,endDate } = req.query;
+    const { page, limit, search,startDate,endDate ,qty} = req.query;
     const query = {};
     if (startDate && endDate) {
       query.createdAt = {
