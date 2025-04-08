@@ -349,8 +349,8 @@ exports.fetchSalesReport = async (req, res) => {
         invoiceMap.set(invoiceNumber, {
           invoiceNumber,
           saleDate: sale.saleDate,
-          createdBy: sale.createdBy,
-          items: [],
+          // createdBy: sale.createdBy.,
+          // items: [],
           totalAmount: 0,
         });
       }
