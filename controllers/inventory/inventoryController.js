@@ -188,14 +188,15 @@ exports.deleteInventory = async (req, res, next) => {
 
 exports.reportInventory = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
-    const query = {};
+    const { startDate, endDate ,type} = req.query;
+    let  query = {};
     if (startDate && endDate) {
       query.createdAt = {
         $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').utc().toDate(),
         $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
       };
     }
+    if(type =="Inventory"){
     const [noOFItems, totalStockValue, allInventoryItems] = await Promise.all([
       Inventory.countDocuments(query),
       Inventory.aggregate([
@@ -229,8 +230,6 @@ exports.reportInventory = async (req, res, next) => {
     ]);
 
     const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
-
-    // Check which inventory items are low in stock (i.e., net quantity is 0)
     const lowStockChecks = await Promise.all(
       allInventoryItems.map(async (item) => {
         const sales = await Sale.find({ itemId: item._id });
@@ -264,6 +263,31 @@ exports.reportInventory = async (req, res, next) => {
       totalStockValue: totalValue,
       lowStockItems: lowStockCount,
     });
+  }else{
+    query.isDeleted = false;
+    query.orderType = "Sales";
+    const sales = await Sale.find();
+    const uniqueInvoices = new Set(query);
+    let totalSalesAmount = 0;
+    sales.forEach(sale => {
+      const price = parseFloat(sale.pricePerUnit) || 0;
+      const qty = parseInt(sale.quantity, 10) || 0;
+      totalSalesAmount += price * qty;
+      if (sale.invoiceNumber) {
+        uniqueInvoices.add(sale.invoiceNumber);
+      }
+    });
+    const totalInvoices = uniqueInvoices.size;
+    const totalSales = sales.length;
+    const totalSalesValue = totalSalesAmount > 0 ? totalSalesAmount : 0;
+    const totalInvoicesValue = totalInvoices > 0 ? totalInvoices : 0;
+    const totalSalesCount = totalSales > 0 ? totalSales : 0;
+    return successResponse(res, 'Sales report fetched successfully', {
+      noOFItems: totalInvoicesValue,
+      totalStockValue: totalSalesValue,
+      lowStockItems:0
+    });
+  }
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
