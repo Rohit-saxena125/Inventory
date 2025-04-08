@@ -1,5 +1,5 @@
 const Sale = require('../../models/Sales/salesModel');
-const SaleDummy = require('../../models/Sales/salesDummyModel')
+const SaleDummy = require('../../models/Sales/salesDummyModel');
 const InvoiceCounter = require('../../models/Sales/invoiceCounterModel');
 const {
   successResponse,
@@ -8,17 +8,21 @@ const {
 } = require('../../utils/customResponse');
 const { pagination } = require('../../utils/pagination');
 const PDFDocument = require('pdfkit');
-const {misData} = require("../../middlewares/upload/upload")
+const { misData } = require('../../middlewares/upload/upload');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
 
 exports.fetchSales = async (req, res) => {
   try {
-    const { page, limit, search, itemId,startDate,endDate,userId } = req.query;
-    const query = {isDeleted:false};
+    const { page, limit, search, itemId, startDate, endDate, userId } =
+      req.query;
+    const query = { isDeleted: false };
     if (itemId) {
       query.itemId = itemId;
+    }
+    else{
+      query.orderType = 'Sales';
     }
     if (userId) {
       query.createdBy = userId;
@@ -27,7 +31,6 @@ exports.fetchSales = async (req, res) => {
       query.saleDate = {
         $gte: moment.tz(startDate, 'Asia/Kolkata').utc().toDate(),
         $lte: moment.tz(endDate, 'Asia/Kolkata').utc().toDate(),
-       
       };
     }
     if (search) {
@@ -36,10 +39,16 @@ exports.fetchSales = async (req, res) => {
         $options: 'i',
       };
     }
-    const populate = [
-      {path: 'itemId',select: 'itemName'},
-    ]
-    const sales = await pagination(Sale, query, page, limit,null,null,populate);
+    const populate = [{ path: 'itemId', select: 'itemName' }];
+    const sales = await pagination(
+      Sale,
+      query,
+      page,
+      limit,
+      null,
+      null,
+      populate
+    );
     sales.result = await Promise.all(
       sales.result.map(async (item) => {
         const totalPrice = (
@@ -63,7 +72,9 @@ exports.fetchSales = async (req, res) => {
 exports.fetchSalesById = async (req, res) => {
   try {
     const { id } = req.params;
-    const sales = await Sale.findOne({_id:id,isDeleted:false}).populate('itemId');
+    const sales = await Sale.findOne({ _id: id, isDeleted: false }).populate(
+      'itemId'
+    );
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
@@ -87,7 +98,7 @@ exports.createSales = async (req, res) => {
       customerName,
       discount,
       totalAmount,
-      invoiceNumber
+      invoiceNumber,
     } = req.body;
     // await updateInvoiceNumber(invoiceNumber);
     let sales = await SaleDummy.create({
@@ -103,7 +114,9 @@ exports.createSales = async (req, res) => {
       invoiceNumber,
       createdBy: req.user._id,
     });
-    const sale = await SaleDummy.findById({_id:sales._id}).populate({ path: 'itemId' }).populate({ path: 'createdBy' });
+    const sale = await SaleDummy.findById({ _id: sales._id })
+      .populate({ path: 'itemId' })
+      .populate({ path: 'createdBy' });
     return successResponse(res, 'Sales created successfully', sale);
   } catch (error) {
     return internalServerErrorResponse(res, error);
@@ -119,7 +132,7 @@ exports.createFinalSales = async (req, res) => {
 
     const sales = [];
     for (const item of listSales) {
-      const dummySales = await SaleDummy.findOne({_id:item});
+      const dummySales = await SaleDummy.findOne({ _id: item });
       if (!dummySales) {
         return badRequestErrorResponse(res, 'Sales not found');
       }
@@ -141,22 +154,23 @@ exports.createFinalSales = async (req, res) => {
       sales.push(sale._id);
     }
 
-    return successResponse(res, 'Sales created successfully',sales);
+    return successResponse(res, 'Sales created successfully', sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
-}
-
+};
 
 exports.fetchDummySales = async (req, res) => {
   try {
-    const {invoiceNumber} = req.query;
-    let sales = await SaleDummy.find({invoiceNumber:invoiceNumber}).populate('itemId').populate('createdBy');
+    const { invoiceNumber } = req.query;
+    let sales = await SaleDummy.find({ invoiceNumber: invoiceNumber })
+      .populate('itemId')
+      .populate('createdBy');
     if (!sales) {
       return badRequestErrorResponse(res, 'Sales not found');
     }
     let totalBill = 0;
-    sales =  await Promise.all(
+    sales = await Promise.all(
       sales.map(async (item) => {
         const totalPrice = (
           parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
@@ -169,12 +183,16 @@ exports.fetchDummySales = async (req, res) => {
           ...item.toObject(),
           totalPrice: totalPrice - parseFloat(item.discount),
         };
-      }))
-    return successResponse(res, 'Sales fetched successfully', {sales,totalBill});
+      })
+    );
+    return successResponse(res, 'Sales fetched successfully', {
+      sales,
+      totalBill,
+    });
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
-}
+};
 
 exports.updateSales = async (req, res) => {
   try {
@@ -197,8 +215,9 @@ exports.updateSales = async (req, res) => {
       return badRequestErrorResponse(res, 'Opening stock cannot be updated');
     }
     if (sales.orderType === 'Sales') {
-      const updatedSales = await Sale.findByIdAndUpdate
-        (id, {
+      const updatedSales = await Sale.findByIdAndUpdate(
+        id,
+        {
           orderType: 'Sales',
           quantity,
           pricePerUnit,
@@ -229,7 +248,11 @@ exports.deleteSales = async (req, res) => {
       return badRequestErrorResponse(res, 'Opening stock cannot be deleted');
     }
     if (sales.orderType === 'Sales') {
-    await Sale.findByIdAndUpdate(id,{$set:{isDeleted:true}},{new:true,runValidators:true});
+      await Sale.findByIdAndUpdate(
+        { invoiceNumber: sales.invoiceNumber },
+        { $set: { isDeleted: true } },
+        { new: true, runValidators: true }
+      );
     }
     return successResponse(res, 'Sales deleted successfully');
   } catch (error) {
@@ -245,8 +268,10 @@ exports.downloadInvoice = async (req, res) => {
       return badRequestErrorResponse(res, 'No sales provided');
     }
     const salesData = await Sale.find({
-      _id: { $in: listSales }
-    }).populate('itemId').populate('createdBy');
+      _id: { $in: listSales },
+    })
+      .populate('itemId')
+      .populate('createdBy');
 
     if (!salesData || salesData.length === 0) {
       return badRequestErrorResponse(res, 'Sales not found');
@@ -261,23 +286,25 @@ exports.downloadInvoice = async (req, res) => {
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
-}
+};
 
 exports.deleteSalesAll = async (req, res) => {
   try {
-    await Sale.deleteMany({orderType:"Sales"});
+    await Sale.deleteMany({ orderType: 'Sales' });
     return successResponse(res, 'All Sales deleted successfully ');
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
 };
 async function generateInvoiceNumber() {
-    const latestSale = await Sale.findOne({orderType:"Sales"}).sort({_id:-1});
-    if (latestSale && !isNaN(latestSale.invoiceNumber)) {
-      return latestSale.invoiceNumber + 1;
-    }
-    return 1; 
+  const latestSale = await Sale.findOne({ orderType: 'Sales' }).sort({
+    _id: -1,
+  });
+  if (latestSale && !isNaN(latestSale.invoiceNumber)) {
+    return latestSale.invoiceNumber + 1;
   }
+  return 1;
+}
 
 exports.fetchInvoiceNumber = async (req, res) => {
   try {
@@ -286,33 +313,45 @@ exports.fetchInvoiceNumber = async (req, res) => {
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
+};
+
+async function updateInvoiceNumber(invoiceNumber) {
+  const isinvoiceNumber = await InvoiceCounter.findOne({
+    invoiceNumber: invoiceNumber,
+  });
+  if (isinvoiceNumber) {
+    let invoiceNumbergen = await generateInvoiceNumber();
+    await InvoiceCounter.findOneAndUpdate(
+      {},
+      { $set: { invoiceNumber: invoiceNumbergen } },
+      { upsert: true }
+    );
+  }
+  await InvoiceCounter.findOneAndUpdate(
+    {},
+    { $set: { invoiceNumber: invoiceNumber } },
+    { upsert: true }
+  );
 }
 
-  async function updateInvoiceNumber(invoiceNumber) {
-    const isinvoiceNumber = await InvoiceCounter.findOne({invoiceNumber:invoiceNumber});
-    if (isinvoiceNumber) {
-      let invoiceNumbergen = await generateInvoiceNumber();
-      await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumbergen} }, { upsert: true });
-    }
-    await InvoiceCounter.findOneAndUpdate({}, { $set: { invoiceNumber: invoiceNumber } }, { upsert: true });
-  }
-
-  
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument();
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
-    doc.fontSize(20).text("Combined Sales Invoice", { align: "center" }).moveDown();
+    doc
+      .fontSize(20)
+      .text('Combined Sales Invoice', { align: 'center' })
+      .moveDown();
     invoiceDataArray.forEach((sale, index) => {
-      const saleDate = new Date(sale.saleDate).toLocaleString("en-US", {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
+      const saleDate = new Date(sale.saleDate).toLocaleString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
         hour12: true,
       });
       doc
@@ -334,63 +373,77 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     doc.end();
 
-    stream.on("finish", () => resolve(outputPath));
-    stream.on("error", reject);
+    stream.on('finish', () => resolve(outputPath));
+    stream.on('error', reject);
   });
 }
-  
 
-  exports.downloadSalesReport = async (req, res) => {
-    try {
-      const { format = 'pdf', headers = [], startDate, endDate, userId, search } = req.body;
-      const query = { isDeleted: false };
-      if (userId) query.createdBy = userId;
-      if (startDate && endDate) {
-        query.saleDate = {
-          $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
-          $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate()
-        };
-      }
-      if (search) {
-        query.orderType = { $regex: search, $options: 'i' };
-      }
-  
-      const sales = await Sale.find(query).populate('itemId').populate('createdBy');
-  
-      if (!sales || sales.length === 0) {
-        return badRequestErrorResponse(res, 'No sales data found for the given filters.');
-      }
-  
-      const fileName = `sales-report-${Date.now()}.${format}`;
-      const outputPath = path.join(__dirname,fileName);
-  
-      if (format === 'pdf') {
-        await createSalesReportPDF(sales, headers, outputPath);
-      } else if (format === 'csv') {
-        await createSalesReportCSV(sales, headers, outputPath);
-      } else {
-        return badRequestErrorResponse(res, 'Invalid format. Use "pdf" or "csv".');
-      }
-  
-      const s3Url = await misData(outputPath);
-      fs.unlinkSync(outputPath); // Clean up temp file
-  
-      return successResponse(res, 'Sales report downloaded successfully', s3Url);
-    } catch (error) {
-      return internalServerErrorResponse(res, error);
+exports.downloadSalesReport = async (req, res) => {
+  try {
+    const {
+      format = 'pdf',
+      headers = [],
+      startDate,
+      endDate,
+      userId,
+      search,
+    } = req.body;
+    const query = { isDeleted: false };
+    if (userId) query.createdBy = userId;
+    if (startDate && endDate) {
+      query.saleDate = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+      };
     }
-  };
-  const DEFAULT_HEADERS = [
-    'saleDate',
-    'itemId',
-    'quantity',
-    'pricePerUnit',
-    'stock value',
-    'salesPrice',
-    'purchasePrice',
-  ];
-  
-  // PDF Generator
+    if (search) {
+      query.orderType = { $regex: search, $options: 'i' };
+    }
+
+    const sales = await Sale.find(query)
+      .populate('itemId')
+      .populate('createdBy');
+
+    if (!sales || sales.length === 0) {
+      return badRequestErrorResponse(
+        res,
+        'No sales data found for the given filters.'
+      );
+    }
+
+    const fileName = `sales-report-${Date.now()}.${format}`;
+    const outputPath = path.join(__dirname, fileName);
+
+    if (format === 'pdf') {
+      await createSalesReportPDF(sales, headers, outputPath);
+    } else if (format === 'csv') {
+      await createSalesReportCSV(sales, headers, outputPath);
+    } else {
+      return badRequestErrorResponse(
+        res,
+        'Invalid format. Use "pdf" or "csv".'
+      );
+    }
+
+    const s3Url = await misData(outputPath);
+    fs.unlinkSync(outputPath); // Clean up temp file
+
+    return successResponse(res, 'Sales report downloaded successfully', s3Url);
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+};
+const DEFAULT_HEADERS = [
+  'saleDate',
+  'itemId',
+  'quantity',
+  'pricePerUnit',
+  'stock value',
+  'salesPrice',
+  'purchasePrice',
+];
+
+// PDF Generator
 async function createSalesReportPDF(salesData, headers, outputPath) {
   if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
 
@@ -420,7 +473,9 @@ async function createSalesReportCSV(salesData, headers, outputPath) {
   if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
 
   const rows = salesData.map((sale) => {
-    return headers.map(header => `"${getValueByHeader(sale, header)}"`).join(',');
+    return headers
+      .map((header) => `"${getValueByHeader(sale, header)}"`)
+      .join(',');
   });
   const csvContent = [headers.join(','), ...rows].join('\n');
   fs.writeFileSync(outputPath, csvContent);
@@ -429,16 +484,23 @@ async function createSalesReportCSV(salesData, headers, outputPath) {
 // Helper to resolve field values
 function getValueByHeader(sale, header) {
   switch (header) {
-    case 'saleDate': return sale.saleDate
-      ? moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
-      : '-';
-    case 'itemId': return sale.itemId?.itemName || '-';
-    case 'quantity': return sale.quantity || 0;
-    case 'pricePerUnit': return sale.pricePerUnit || 0;
-    case 'stock value': return ((sale.pricePerUnit || 0) * (sale.quantity || 0)).toFixed(2);
-    case 'salesPrice': return sale.itemId?.salePrice || '-';
-    case 'purchasePrice': return sale.itemId?.purchasePrice || '-';
-    default: return '';
+    case 'saleDate':
+      return sale.saleDate
+        ? moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
+        : '-';
+    case 'itemId':
+      return sale.itemId?.itemName || '-';
+    case 'quantity':
+      return sale.quantity || 0;
+    case 'pricePerUnit':
+      return sale.pricePerUnit || 0;
+    case 'stock value':
+      return ((sale.pricePerUnit || 0) * (sale.quantity || 0)).toFixed(2);
+    case 'salesPrice':
+      return sale.itemId?.salePrice || '-';
+    case 'purchasePrice':
+      return sale.itemId?.purchasePrice || '-';
+    default:
+      return '';
   }
 }
-  
