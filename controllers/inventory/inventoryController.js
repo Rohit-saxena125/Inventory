@@ -6,7 +6,7 @@ const {
   internalServerErrorResponse,
 } = require('../../utils/customResponse');
 const { pagination } = require('../../utils/pagination');
-
+const moment = require('moment-timezone');
 exports.createInventory = async (req, res, next) => {
   try {
     const {
@@ -47,8 +47,14 @@ exports.createInventory = async (req, res, next) => {
 
 exports.getAllInventory = async (req, res, next) => {
   try {
-    const { page, limit, search } = req.query;
+    const { page, limit, search,startDate,endDate } = req.query;
     const query = {};
+    if (startDate && endDate) {
+      query.createdAt = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').utc().toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
+      };
+    }
     if (search) {
       query.itemName = {
         $regex: search,
