@@ -188,9 +188,18 @@ exports.deleteInventory = async (req, res, next) => {
 
 exports.reportInventory = async (req, res, next) => {
   try {
+    const { startDate, endDate } = req.query;
+    const query = {};
+    if (startDate && endDate) {
+      query.createdAt = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').utc().toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
+      };
+    }
     const [noOFItems, totalStockValue, allInventoryItems] = await Promise.all([
-      Inventory.countDocuments({}),
+      Inventory.countDocuments(query),
       Inventory.aggregate([
+        { $match: query },
         {
           $lookup: {
             from: 'sales',
@@ -216,7 +225,7 @@ exports.reportInventory = async (req, res, next) => {
           },
         },
       ]),
-      Inventory.find(),
+      Inventory.find(query),
     ]);
 
     const totalValue = totalStockValue.length > 0 ? totalStockValue[0].totalStockValue : 0;
