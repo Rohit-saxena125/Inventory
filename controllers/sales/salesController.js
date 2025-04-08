@@ -357,12 +357,6 @@ exports.fetchSalesReport = async (req, res) => {
 
       const invoiceData = invoiceMap.get(invoiceNumber);
       invoiceData.totalAmount += amount;
-      invoiceData.items.push({
-        itemName: sale.itemId?.itemName || 'Unknown',
-        quantity: qty,
-        pricePerUnit: price,
-        amount,
-      });
     });
 
     const uniqueInvoices = Array.from(invoiceMap.values());
