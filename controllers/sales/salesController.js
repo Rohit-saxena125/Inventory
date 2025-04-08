@@ -303,7 +303,7 @@ exports.deleteSalesAll = async (req, res) => {
     if (userId) {
       query.createdBy = userId;
     }
-    await Sale.updateManyMany(query,{ $set: { isDeleted: true } }, { new: true, runValidators: true });
+    await Sale.updateMany(query,{ $set: { isDeleted: true } }, { new: true, runValidators: true });
     return successResponse(res, 'All Sales deleted successfully ');
   } catch (error) {
     return internalServerErrorResponse(res, error);
