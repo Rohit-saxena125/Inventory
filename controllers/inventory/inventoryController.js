@@ -188,7 +188,7 @@ exports.deleteInventory = async (req, res, next) => {
 
 exports.reportInventory = async (req, res, next) => {
   try {
-    const { startDate, endDate ,type} = req.query;
+    const { startDate, endDate ,type,userId} = req.query;
     let  query = {};
     if (startDate && endDate) {
       query.createdAt = {
@@ -266,6 +266,7 @@ exports.reportInventory = async (req, res, next) => {
   }else{
     query.isDeleted = false;
     query.orderType = "Sales";
+    query.createdBy = userId;
     const sales = await Sale.find(query);
 
   const uniqueInvoices = new Set(); 
