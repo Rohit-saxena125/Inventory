@@ -66,9 +66,12 @@ exports.getAllInventory = async (req, res, next) => {
       inventory.result.map(async (item) => {
         const sales = await Sale.find({ itemId: item._id });
         let quantity = 0;
+        let stockValue = 0;
         sales.forEach((sale) => {
+          const pricePerUnit = parseFloat(sale.pricePerUnit);
           if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
             quantity += parseInt(sale.quantity, 10);
+            stockValue += quantity * pricePerUnit;
           } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
             quantity -= parseInt(sale.quantity, 10);
           }
@@ -76,6 +79,7 @@ exports.getAllInventory = async (req, res, next) => {
         return {
           ...item.toObject(),
           quantity: quantity>0 ? quantity : 0,
+          stockValue : stockValue.toFixed(2)>0? stockValue.toFixed(2) : 0,
         };
       })
     );
@@ -106,7 +110,6 @@ exports.getInventoryById = async (req, res, next) => {
     sales.forEach((sale) => {
       const quantity = parseInt(sale.quantity, 10);
       const pricePerUnit = parseFloat(sale.pricePerUnit);
-
       if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
         inventory.quantity += quantity;
         inventory.stockValue += quantity * pricePerUnit;
