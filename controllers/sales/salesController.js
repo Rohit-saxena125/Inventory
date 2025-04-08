@@ -292,13 +292,16 @@ exports.downloadInvoice = async (req, res) => {
 exports.deleteSalesAll = async (req, res) => {
   try {
     const {startDate, endDate,userId} = req.query;
-    const query = {
-      createdAt: {
+    const query = { isDeleted: false };
+    if(startDate && endDate){
+    query.createdAt= {
         $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
         $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
-      },
-      orderType: 'Sales',
-      createdBy: userId,
+      }
+    }
+    query.orderType = 'Sales';
+    if (userId) {
+      query.createdBy = userId;
     }
     await Sale.deleteMany(query);
     return successResponse(res, 'All Sales deleted successfully ');
