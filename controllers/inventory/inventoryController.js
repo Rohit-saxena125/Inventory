@@ -266,27 +266,28 @@ exports.reportInventory = async (req, res, next) => {
   }else{
     query.isDeleted = false;
     query.orderType = "Sales";
-    const sales = await Sale.find();
-    const uniqueInvoices = new Set(query);
-    let totalSalesAmount = 0;
-    sales.forEach(sale => {
-      const price = parseFloat(sale.pricePerUnit) || 0;
-      const qty = parseInt(sale.quantity, 10) || 0;
-      totalSalesAmount += price * qty;
-      if (sale.invoiceNumber) {
-        uniqueInvoices.add(sale.invoiceNumber);
-      }
-    });
-    const totalInvoices = uniqueInvoices.size;
-    const totalSales = sales.length;
-    const totalSalesValue = totalSalesAmount > 0 ? totalSalesAmount : 0;
-    const totalInvoicesValue = totalInvoices > 0 ? totalInvoices : 0;
-    const totalSalesCount = totalSales > 0 ? totalSales : 0;
-    return successResponse(res, 'Sales report fetched successfully', {
-      noOFItems: totalInvoicesValue,
-      totalStockValue: totalSalesValue,
-      lowStockItems:0
-    });
+    const sales = await Sale.find(query);
+
+  const uniqueInvoices = new Set(); 
+  let totalSalesAmount = 0;
+
+  sales.forEach(sale => {
+    const price = parseFloat(sale.pricePerUnit) || 0;
+    const qty = parseInt(sale.quantity, 10) || 0;
+    totalSalesAmount += price * qty;
+
+    if (sale.invoiceNumber) {
+      uniqueInvoices.add(sale.invoiceNumber);
+    }
+  });
+
+  const totalInvoices = uniqueInvoices.size;
+
+  return successResponse(res, 'Sales report fetched successfully', {
+    noOFItems: totalInvoices,
+    totalStockValue: totalSalesAmount.toFixed(2),
+    lowStockItems: 0,
+  });
   }
   } catch (error) {
     return internalServerErrorResponse(res, error);
