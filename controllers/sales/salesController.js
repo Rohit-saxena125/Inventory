@@ -341,6 +341,7 @@ exports.fetchSalesReport = async (req, res) => {
         $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
       };
     }
+    console.log('query', query);
     const sales = await Sale.find(query)
       .populate('itemId')
       .populate('createdBy');
@@ -350,6 +351,7 @@ exports.fetchSalesReport = async (req, res) => {
         'No sales data found for the given filters.'
       );
     }
+    console.log('sales', sales);
     const invoiceMap = new Map();
 
     sales.forEach((sale) => {
