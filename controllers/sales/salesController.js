@@ -248,7 +248,7 @@ exports.deleteSales = async (req, res) => {
       return badRequestErrorResponse(res, 'Opening stock cannot be deleted');
     }
     if (sales.orderType === 'Sales') {
-      await Sale.findByIdAndUpdate(
+      await Sale.updateMany(
         { invoiceNumber: sales.invoiceNumber },
         { $set: { isDeleted: true } },
         { new: true, runValidators: true }
@@ -314,6 +314,67 @@ exports.fetchInvoiceNumber = async (req, res) => {
     return internalServerErrorResponse(res, error);
   }
 };
+
+exports.fetchSalesReport = async (req, res) => {
+  try {
+    const { startDate, endDate, userId } = req.body;
+    const query = { isDeleted: false };
+    if (userId) {
+      query.createdBy = userId;
+    }
+    if (startDate && endDate) {
+      query.saleDate = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+      };
+    }
+    const sales = await Sale.find(query)
+      .populate('itemId')
+      .populate('createdBy');
+    if (!sales || sales.length === 0) {
+      return badRequestErrorResponse(
+        res,
+        'No sales data found for the given filters.'
+      );
+    }
+    const invoiceMap = new Map();
+
+    sales.forEach((sale) => {
+      const invoiceNumber = sale.invoiceNumber;
+      const price = parseFloat(sale.pricePerUnit || 0);
+      const qty = parseInt(sale.quantity, 10) || 0;
+      const amount = price * qty;
+
+      if (!invoiceMap.has(invoiceNumber)) {
+        invoiceMap.set(invoiceNumber, {
+          invoiceNumber,
+          saleDate: sale.saleDate,
+          createdBy: sale.createdBy,
+          items: [],
+          totalAmount: 0,
+        });
+      }
+
+      const invoiceData = invoiceMap.get(invoiceNumber);
+      invoiceData.totalAmount += amount;
+      invoiceData.items.push({
+        itemName: sale.itemId?.itemName || 'Unknown',
+        quantity: qty,
+        pricePerUnit: price,
+        amount,
+      });
+    });
+
+    const uniqueInvoices = Array.from(invoiceMap.values());
+
+    return successResponse(res, 'Sales report fetched successfully', {
+      count: uniqueInvoices.length,
+      invoices: uniqueInvoices,
+    });
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
 
 async function updateInvoiceNumber(invoiceNumber) {
   const isinvoiceNumber = await InvoiceCounter.findOne({

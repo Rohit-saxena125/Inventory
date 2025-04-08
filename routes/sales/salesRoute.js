@@ -13,4 +13,5 @@ router.post('/fetchSalesReport', tokenVerify, checkRole(['Admin']), salesControl
 router.get('/fetchInvoiceNumber', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchInvoiceNumber);
 router.get('/fetchSaleDummy', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchDummySales);
 router.post('/createFinalSales', tokenVerify, checkRole(['Admin','Cashier']), salesController.createFinalSales);
+router.get('/fetchSalesReport', tokenVerify, checkRole(['Admin']), salesController.fetchSalesReport);
 module.exports = router;
