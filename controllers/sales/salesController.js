@@ -330,7 +330,7 @@ exports.fetchInvoiceNumber = async (req, res) => {
 
 exports.fetchSalesReport = async (req, res) => {
   try {
-    const { startDate, endDate, userId } = req.body;
+    const { startDate, endDate, userId } = req.query;
     const query = { isDeleted: false ,orderType: 'Sales'};
     if (userId) {
       query.createdBy = userId;
