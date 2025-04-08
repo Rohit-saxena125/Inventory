@@ -348,12 +348,7 @@ exports.fetchSalesReport = async (req, res) => {
     const sales = await Sale.find(query)
       .populate('itemId')
       .populate('createdBy');
-    if (!sales || sales.length === 0) {
-      return badRequestErrorResponse(
-        res,
-        'No sales data found for the given filters.'
-      );
-    }
+    
     console.log('sales', sales);
     const invoiceMap = new Map();
 
