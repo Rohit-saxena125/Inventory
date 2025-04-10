@@ -437,7 +437,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     doc
       .fontSize(12)
       .font('Courier-Bold')
-      .text('SALES STORE', { align: 'center' })
+      .text('', { align: 'center' })
       .fontSize(9)
       .text('-------------------------------');
 

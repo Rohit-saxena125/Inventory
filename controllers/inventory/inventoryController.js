@@ -7,6 +7,7 @@ const {
 } = require('../../utils/customResponse');
 const { pagination } = require('../../utils/pagination');
 const moment = require('moment-timezone');
+
 exports.createInventory = async (req, res, next) => {
   try {
     const {
@@ -85,8 +86,8 @@ exports.getAllInventory = async (req, res, next) => {
         });
         return {
           ...item.toObject(),
-          quantity: quantity > 0 ? quantity : 0,
-          stockValue: stockValue.toFixed(2) > 0 ? stockValue.toFixed(2) : 0,
+          quantity:  quantity ,
+          stockValue: stockValue.toFixed(2),
         };
       })
     );
