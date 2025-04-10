@@ -12,7 +12,6 @@ const { misData } = require('../../middlewares/upload/upload');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
-const { create } = require('../../models/inventory/inventoryModel');
 
 exports.fetchSales = async (req, res) => {
   try {
@@ -108,16 +107,14 @@ exports.createSales = async (req, res) => {
       pricePerUnit,
       description,
       saleDate: (() => {
-        const datePart = new Date(saleDate);
-        const now = new Date();
-        return new Date(
-          datePart.getFullYear(),
-          datePart.getMonth(),
-          datePart.getDate(),
-          now.getHours(),
-          now.getMinutes(),
-          now.getSeconds()
-        );
+        const datePart = moment.tz(saleDate, 'Asia/Kolkata');
+        const currentTime = moment.tz('Asia/Kolkata');
+        datePart.set({
+          hour: currentTime.hour(),
+          minute: currentTime.minute(),
+          second: currentTime.second(),
+        });
+        return datePart.toDate();
       })(),
       itemId,
       customerName,
