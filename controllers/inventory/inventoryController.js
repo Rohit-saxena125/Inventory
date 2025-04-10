@@ -82,6 +82,7 @@ exports.getAllInventory = async (req, res, next) => {
             sale.orderType === 'Reduce'
           ) {
             quantity -= parseInt(sale.quantity, 10);
+            stockValue -= quantity * pricePerUnit;
           }
         });
         return {
