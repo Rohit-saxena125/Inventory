@@ -504,7 +504,7 @@ exports.downloadSalesReport = async (req, res) => {
       search,
       type = 'Sales',
     } = req.body;
-
+console.log('type', type);
     if (type == 'Sales') {
       const query = { isDeleted: false, orderType: 'Sales' };
       if (userId) {
