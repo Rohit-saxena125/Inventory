@@ -430,7 +430,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const itemName = sale.itemId.itemName;
       const qty = sale.quantity.toString();
       const rate = `₹${parseFloat(sale.pricePerUnit).toFixed(2)}`;
-      const amount = `₹${parseFloat(sale.totalAmount.replace(/[₹ ]/g, '')).toFixed(2)}`;
+      const amount = parseFloat(sale.totalAmount.replace(/[₹ ]/g, '')).toFixed(2);
 
       doc.text(
         `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(6)} ₹${amount}`
