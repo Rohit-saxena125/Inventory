@@ -115,6 +115,7 @@ exports.createSales = async (req, res) => {
       invoiceNumber,
       createdBy: req.user._id,
     });
+    console.log('sales', sales,saleDate);
     const sale = await SaleDummy.findById({ _id: sales._id })
       .populate({ path: 'itemId' })
       .populate({ path: 'createdBy' });
