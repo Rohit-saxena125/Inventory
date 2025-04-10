@@ -344,36 +344,26 @@ exports.fetchSalesReport = async (req, res) => {
         $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
       };
     }
-    console.log('query', query);
     const sales = await Sale.find(query)
       .populate('itemId')
-      .populate('createdBy');
-    
-    console.log('sales', sales);
+      .populate('createdBy').sort({createdAt: -1});
     const invoiceMap = new Map();
-
     sales.forEach((sale) => {
       const invoiceNumber = sale.invoiceNumber;
       const price = parseFloat(sale.pricePerUnit || 0);
       const qty = parseInt(sale.quantity, 10) || 0;
       const amount = price * qty;
-
       if (!invoiceMap.has(invoiceNumber)) {
         invoiceMap.set(invoiceNumber, {
           invoiceNumber,
           saleDate: sale.saleDate,
-          // createdBy: sale.createdBy.,
-          // items: [],
           totalAmount: 0,
         });
       }
-
       const invoiceData = invoiceMap.get(invoiceNumber);
       invoiceData.totalAmount += amount;
     });
-
     const uniqueInvoices = Array.from(invoiceMap.values());
-
     return successResponse(res, 'Sales report fetched successfully', {
       count: uniqueInvoices.length,
       invoices: uniqueInvoices,
