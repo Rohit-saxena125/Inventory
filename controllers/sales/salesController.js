@@ -20,8 +20,7 @@ exports.fetchSales = async (req, res) => {
     const query = { isDeleted: false };
     if (itemId) {
       query.itemId = itemId;
-    }
-    else{
+    } else {
       query.orderType = 'Sales';
     }
     if (userId) {
@@ -299,13 +298,13 @@ exports.downloadInvoice = async (req, res) => {
 
 exports.deleteSalesAll = async (req, res) => {
   try {
-    const {startDate, endDate,userId,invoiceNumber} = req.query;
+    const { startDate, endDate, userId, invoiceNumber } = req.query;
     const query = { isDeleted: false };
-    if(startDate && endDate){
-    query.createdAt= {
+    if (startDate && endDate) {
+      query.createdAt = {
         $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
         $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
-      }
+      };
     }
     query.orderType = 'Sales';
     if (userId) {
@@ -314,7 +313,11 @@ exports.deleteSalesAll = async (req, res) => {
     if (invoiceNumber) {
       query.invoiceNumber = invoiceNumber;
     }
-    await Sale.updateMany(query,{ $set: { isDeleted: true } }, { new: true, runValidators: true });
+    await Sale.updateMany(
+      query,
+      { $set: { isDeleted: true } },
+      { new: true, runValidators: true }
+    );
     return successResponse(res, 'All Sales deleted successfully ');
   } catch (error) {
     return internalServerErrorResponse(res, error);
@@ -342,7 +345,7 @@ exports.fetchInvoiceNumber = async (req, res) => {
 exports.fetchSalesReport = async (req, res) => {
   try {
     const { startDate, endDate, userId } = req.query;
-    const query = { isDeleted: false ,orderType: 'Sales'};
+    const query = { isDeleted: false, orderType: 'Sales' };
     if (userId) {
       query.createdBy = userId;
     }
@@ -354,7 +357,8 @@ exports.fetchSalesReport = async (req, res) => {
     }
     const sales = await Sale.find(query)
       .populate('itemId')
-      .populate('createdBy').sort({createdAt: -1});
+      .populate('createdBy')
+      .sort({ createdAt: -1 });
     const invoiceMap = new Map();
     sales.forEach((sale) => {
       const invoiceNumber = sale.invoiceNumber;
@@ -379,7 +383,7 @@ exports.fetchSalesReport = async (req, res) => {
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
-}
+};
 
 async function updateInvoiceNumber(invoiceNumber) {
   const isinvoiceNumber = await InvoiceCounter.findOne({
@@ -400,12 +404,19 @@ async function updateInvoiceNumber(invoiceNumber) {
   );
 }
 
+function parseAmount(val) {
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    return parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+  }
+  return 0;
+}
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: [288, 500 + invoiceDataArray.length * 30], // 80mm wide
-      margins: { top: 10, bottom: 10, left: 10, right: 10 }
+      margins: { top: 10, bottom: 10, left: 10, right: 10 },
     });
 
     const stream = fs.createWriteStream(outputPath);
@@ -452,15 +463,13 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const itemName = sale.itemId.itemName;
       const qty = sale.quantity.toString();
       const rate = `Rs.${parseFloat(sale.pricePerUnit).toFixed(2)}`;
-      const amount = parseFloat(
-        sale.totalAmount.toString().replace('Rs.', '').replace(/\s/g, '')
-      ).toFixed(2);
+      const amount = parseAmount(sale.totalAmount).toFixed(2);
 
       doc.text(
         `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs.${amount}`
       );
 
-      const discount = parseFloat(sale.discount) || 0;
+      const discount = parseAmount(sale.discount);
       totalDiscount += discount;
       totalAmount += parseFloat(amount);
     });
@@ -482,7 +491,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
-
 
 exports.downloadSalesReport = async (req, res) => {
   try {
