@@ -85,6 +85,7 @@ exports.getAllInventory = async (req, res, next) => {
             stockValue -= quantity * pricePerUnit;
           }
         });
+        console.log('stockValue', stockValue);
         return {
           ...item.toObject(),
           quantity:  quantity ,
@@ -127,8 +128,8 @@ exports.getInventoryById = async (req, res, next) => {
       }
     });
     inventory.stockValue =
-      inventory.stockValue.toFixed(2) > 0 ? inventory.stockValue.toFixed(2) : 0;
-    inventory.quantity = inventory.quantity > 0 ? inventory.quantity : 0;
+      inventory.stockValue.toFixed(2) ;
+    inventory.quantity = inventory.quantity;
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
     return internalServerErrorResponse(res, error);
