@@ -505,7 +505,7 @@ exports.downloadSalesReport = async (req, res) => {
       type = 'Sales',
     } = req.body;
 
-    if (type == "Sales") {
+    if (type == 'Sales') {
       const query = { isDeleted: false, orderType: 'Sales' };
       if (userId) {
         query.createdBy = userId;
@@ -530,7 +530,7 @@ exports.downloadSalesReport = async (req, res) => {
           invoiceMap.set(invoiceNumber, {
             invoiceNumber,
             saleDate: sale.saleDate,
-            customerName: sale.customerName,
+            customerName: sale.customerName ? sale.customerName : '-',
             createdBy: sale.createdBy.name,
             quantity: qty,
             itemName: sale.itemId.itemName,
@@ -541,13 +541,33 @@ exports.downloadSalesReport = async (req, res) => {
         const invoiceData = invoiceMap.get(invoiceNumber);
         invoiceData.totalAmount += amount;
       });
+      let reportHeaders = [
+        'invoiceNumber',
+        'saleDate',
+        'customerName',
+        'createdBy',
+        'quantity',
+        'itemName',
+        'pricePerUnit',
+        'totalAmount',
+      ];
       const uniqueInvoices = Array.from(invoiceMap.values());
       const fileName = `sales-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
       if (format === 'pdf') {
-        await createSalesReportPDF(uniqueInvoices, headers, outputPath, type);
+        await createSalesReportPDF(
+          uniqueInvoices,
+          reportHeaders,
+          outputPath,
+          type
+        );
       } else if (format === 'csv') {
-        await createSalesReportCSV(uniqueInvoices, headers, outputPath, type);
+        await createSalesReportCSV(
+          uniqueInvoices,
+          reportHeaders,
+          outputPath,
+          type
+        );
       } else {
         return badRequestErrorResponse(
           res,
@@ -556,8 +576,12 @@ exports.downloadSalesReport = async (req, res) => {
       }
       const s3Url = await misData(outputPath);
       fs.unlinkSync(outputPath);
-      return successResponse(res, 'Sales report downloaded successfully', s3Url);
-    } else if (type == "Inventory") {
+      return successResponse(
+        res,
+        'Sales report downloaded successfully',
+        s3Url
+      );
+    } else if (type == 'Inventory') {
       const query = {};
       if (startDate && endDate) {
         query.saleDate = {
@@ -587,18 +611,22 @@ exports.downloadSalesReport = async (req, res) => {
             }
           });
           return {
-            ...item.toObject(),
+            saleDate: item.createdAt,
+            itemId: item.itemName,
             quantity: quantity,
-            stockValue: stockValue.toFixed(2),
+            salesPrice: item.salePrice || 0,
+            purchasePrice: item.purchasePrice || 0,
+            'stock value': stockValue.toFixed(2),
           };
         })
       );
+      const reportHeaders = headers.length > 0 ? headers : DEFAULT_HEADERS;
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
       if (format === 'pdf') {
-        await createSalesReportPDF(inventory, headers, outputPath, type);
+        await createSalesReportPDF(inventory, reportHeaders, outputPath, type);
       } else if (format === 'csv') {
-        await createSalesReportCSV(inventory, headers, outputPath, type);
+        await createSalesReportCSV(inventory, reportHeaders, outputPath, type);
       } else {
         return badRequestErrorResponse(
           res,
@@ -607,7 +635,11 @@ exports.downloadSalesReport = async (req, res) => {
       }
       const s3Url = await misData(outputPath);
       fs.unlinkSync(outputPath);
-      return successResponse(res, 'Inventory report downloaded successfully', s3Url);
+      return successResponse(
+        res,
+        'Inventory report downloaded successfully',
+        s3Url
+      );
     }
   } catch (error) {
     return internalServerErrorResponse(res, error);
@@ -617,16 +649,11 @@ const DEFAULT_HEADERS = [
   'saleDate',
   'itemId',
   'quantity',
-  'pricePerUnit',
   'stock value',
   'salesPrice',
   'purchasePrice',
 ];
-
-// PDF Generator
-async function createSalesReportPDF(salesData, headers, outputPath, type) {
-  if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
-
+async function createSalesReportPDF(data, headers, outputPath, type) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 30 });
     const stream = fs.createWriteStream(outputPath);
@@ -634,9 +661,9 @@ async function createSalesReportPDF(salesData, headers, outputPath, type) {
 
     doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown();
 
-    salesData.forEach((sale) => {
+    data.forEach((entry) => {
       headers.forEach((header) => {
-        let value = getValueByHeader(sale, header);
+        const value = getValueByHeader(entry, header);
         doc.fontSize(12).text(`${header}: ${value}`);
       });
       doc.moveDown();
@@ -649,38 +676,42 @@ async function createSalesReportPDF(salesData, headers, outputPath, type) {
 }
 
 // CSV Generator
-async function createSalesReportCSV(salesData, headers, outputPath) {
-  if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
-
-  const rows = salesData.map((sale) => {
-    return headers
-      .map((header) => `"${getValueByHeader(sale, header)}"`)
-      .join(',');
-  });
+async function createSalesReportCSV(data, headers, outputPath) {
+  const rows = data.map((entry) =>
+    headers.map((header) => `"${getValueByHeader(entry, header)}"`).join(',')
+  );
   const csvContent = [headers.join(','), ...rows].join('\n');
   fs.writeFileSync(outputPath, csvContent);
 }
 
-// Helper to resolve field values
-function getValueByHeader(sale, header) {
+// Helper
+function getValueByHeader(entry, header) {
   switch (header) {
     case 'saleDate':
-      return sale.saleDate
-        ? moment(sale.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
-        : '-';
+      return entry.saleDate ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A') : '-';
     case 'itemId':
-      return sale.itemId?.itemName || '-';
+      return entry.itemId || '-';
     case 'quantity':
-      return sale.quantity || 0;
+      return entry.quantity || 0;
     case 'pricePerUnit':
-      return sale.pricePerUnit || 0;
+      return entry.pricePerUnit || 0;
     case 'stock value':
-      return ((sale.pricePerUnit || 0) * (sale.quantity || 0)).toFixed(2);
+      return entry['stock value'] || '0.00';
     case 'salesPrice':
-      return sale.itemId?.salePrice || '-';
+      return entry.salesPrice || '-';
     case 'purchasePrice':
-      return sale.itemId?.purchasePrice || '-';
+      return entry.purchasePrice || '-';
+    case 'invoiceNumber':
+      return entry.invoiceNumber || '-';
+    case 'customerName':
+      return entry.customerName || '-';
+    case 'createdBy':
+      return entry.createdBy || '-';
+    case 'itemName':
+      return entry.itemName || '-';
+    case 'totalAmount':
+      return entry.totalAmount?.toFixed(2) || '0.00';
     default:
-      return '';
+      return '-';
   }
 }
