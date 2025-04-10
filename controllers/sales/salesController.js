@@ -575,6 +575,7 @@ exports.downloadSalesReport = async (req, res) => {
         );
       }
       const s3Url = await misData(outputPath);
+      console.log('S3 URL:', s3Url);
       fs.unlinkSync(outputPath);
       return successResponse(
         res,
@@ -634,6 +635,7 @@ exports.downloadSalesReport = async (req, res) => {
         );
       }
       const s3Url = await misData(outputPath);
+      console.log('S3 URL:', s3Url);
       fs.unlinkSync(outputPath);
       return successResponse(
         res,
