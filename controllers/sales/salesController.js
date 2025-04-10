@@ -107,7 +107,18 @@ exports.createSales = async (req, res) => {
       quantity,
       pricePerUnit,
       description,
-      saleDate: new Date(saleDate),
+      saleDate: (() => {
+        const datePart = new Date(saleDate);
+        const now = new Date();
+        return new Date(
+          datePart.getFullYear(),
+          datePart.getMonth(),
+          datePart.getDate(),
+          now.getHours(),
+          now.getMinutes(),
+          now.getSeconds()
+        );
+      })(),
       itemId,
       customerName,
       discount,
