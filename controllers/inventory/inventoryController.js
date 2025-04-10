@@ -284,7 +284,9 @@ exports.reportInventory = async (req, res, next) => {
     } else {
       query.isDeleted = false;
       query.orderType = 'Sales';
-      query.createdBy = userId;
+      if(userId) {
+        query.createdBy = userId;
+      }
       console.log('query', query);
       const sales = await Sale.find(query);
       console.log('sales', sales);
