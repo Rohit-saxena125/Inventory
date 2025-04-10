@@ -502,10 +502,9 @@ exports.downloadSalesReport = async (req, res) => {
       endDate,
       userId,
       search,
-      type = 'Sales',
+      type = 'Sale',
     } = req.body;
-console.log('type', type);
-    if (type == 'Sales') {
+    if (type == 'Sale') {
       const query = { isDeleted: false, orderType: 'Sales' };
       if (userId) {
         query.createdBy = userId;
@@ -575,7 +574,6 @@ console.log('type', type);
         );
       }
       const s3Url = await misData(outputPath);
-      console.log('S3 URL:', s3Url);
       fs.unlinkSync(outputPath);
       return successResponse(
         res,
@@ -635,7 +633,6 @@ console.log('type', type);
         );
       }
       const s3Url = await misData(outputPath);
-      console.log('S3 URL:', s3Url);
       fs.unlinkSync(outputPath);
       return successResponse(
         res,
