@@ -435,8 +435,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       doc.text(
         `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(6)} ₹${amount}`
       );
-
-      totalDiscount += parseFloat(sale.discount);
+      const discount = parseFloat(sale.discount) || 0;
+      totalDiscount += discount;
       totalAmount += parseFloat(amount);
     });
 
