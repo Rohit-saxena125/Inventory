@@ -264,7 +264,7 @@ exports.reportInventory = async (req, res, next) => {
 
           return {
             item,
-            isLowStock: quantity === 0,
+            isLowStock: quantity <= 0,
           };
         })
       );
@@ -287,24 +287,18 @@ exports.reportInventory = async (req, res, next) => {
       if(userId) {
         query.createdBy = userId;
       }
-      console.log('query', query);
       const sales = await Sale.find(query);
-      console.log('sales', sales);
       const uniqueInvoices = new Set();
       let totalSalesAmount = 0;
       sales.forEach((sale) => {
         const price = parseFloat(sale.pricePerUnit) || 0;
         const qty = parseInt(sale.quantity, 10) || 0;
         totalSalesAmount += price * qty;
-
         if (sale.invoiceNumber) {
           uniqueInvoices.add(sale.invoiceNumber);
         }
       });
-
       const totalInvoices = uniqueInvoices.size;
-      console.log('totalInvoices', totalInvoices);
-      console.log('totalSalesAmount', totalSalesAmount);
       return successResponse(res, 'Sales report fetched successfully', {
         noOFItems: totalInvoices,
         totalStockValue: totalSalesAmount.toFixed(2),
