@@ -400,15 +400,27 @@ async function updateInvoiceNumber(invoiceNumber) {
   );
 }
 
+
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
-      size: [210, 600 + invoiceDataArray.length * 50], // Expand height with items
+      size: [288, 500 + invoiceDataArray.length * 30], // 80mm wide
       margins: { top: 10, bottom: 10, left: 10, right: 10 }
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
+
+    const firstSale = invoiceDataArray[0]; // Assuming all sales are from the same invoice
+
+    const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
     // HEADER
     doc
@@ -416,38 +428,50 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .font('Courier-Bold')
       .text('SALES STORE', { align: 'center' })
       .fontSize(9)
-      .text('-----------------------------');
+      .text('-------------------------------');
+
+    // Customer + Invoice Info
+    doc
+      .font('Courier')
+      .text(`Customer   : ${firstSale.customerName}`)
+      .text(`Invoice No : ${firstSale.invoiceNumber}`)
+      .text(`Date       : ${formattedDate}`)
+      .text('-------------------------------');
 
     let totalDiscount = 0;
     let totalAmount = 0;
 
+    // Table Heading
     doc
       .font('Courier-Bold')
       .text('Item         Qty  Rate   Amt')
       .font('Courier');
 
+    // Items Loop
     invoiceDataArray.forEach((sale) => {
       const itemName = sale.itemId.itemName;
       const qty = sale.quantity.toString();
-      const rate = `₹${parseFloat(sale.pricePerUnit).toFixed(2)}`;
-      const amount = parseFloat(sale.totalAmount.replace(/[₹ ]/g, '')).toFixed(2);
+      const rate = `Rs.${parseFloat(sale.pricePerUnit).toFixed(2)}`;
+      const amount = parseFloat(
+        sale.totalAmount.toString().replace('Rs.', '').replace(/\s/g, '')
+      ).toFixed(2);
 
       doc.text(
-        `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(6)} ₹${amount}`
+        `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs.${amount}`
       );
+
       const discount = parseFloat(sale.discount) || 0;
       totalDiscount += discount;
       totalAmount += parseFloat(amount);
     });
 
-    doc.text('-----------------------------');
-
-    // TOTAL SECTION
     doc
+      .font('Courier')
+      .text('-------------------------------')
       .font('Courier-Bold')
-      .text(`Discount : ₹${totalDiscount.toFixed(2)}`)
-      .text(`Total    : ₹${totalAmount.toFixed(2)}`)
-      .text('=============================')
+      .text(`Discount   : Rs.${totalDiscount.toFixed(2)}`)
+      .text(`Total      : Rs.${totalAmount.toFixed(2)}`)
+      .text('===============================')
       .fontSize(10)
       .text('Thank you for your purchase!', { align: 'center' })
       .text('Visit Again', { align: 'center' });
@@ -469,6 +493,7 @@ exports.downloadSalesReport = async (req, res) => {
       endDate,
       userId,
       search,
+      type = 'Sales',
     } = req.body;
     const query = { isDeleted: false };
     if (userId) query.createdBy = userId;
