@@ -403,17 +403,22 @@ async function updateInvoiceNumber(invoiceNumber) {
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
-      size: [210, 600 + invoiceDataArray.length * 200], // A custom height depending on how many invoices
+      size: [210, 600 + invoiceDataArray.length * 200], // 58mm width, height grows with content
       margins: { top: 10, bottom: 10, left: 10, right: 10 }
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
+    // HEADER
     doc
-      .fontSize(14)
-      .text('*** Sales Invoice ***', { align: 'center' })
-      .moveDown(0.5);
+      .fontSize(12)
+      .font('Courier-Bold')
+      .text('MJ SALES STORE', { align: 'center' })
+      .fontSize(9)
+      .text('GSTIN: 1234567890', { align: 'center' })
+      .text('Phone: +91-9876543210', { align: 'center' })
+      .text('-----------------------------');
 
     invoiceDataArray.forEach((sale, index) => {
       const saleDate = new Date(sale.saleDate).toLocaleString('en-US', {
@@ -427,26 +432,35 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       });
 
       doc
-        .fontSize(10)
-        .text(`-------------------------------`)
-        .text(`Invoice No: ${sale.invoiceNumber}`)
-        .text(`Customer: ${sale.customerName}`)
-        .text(`Date: ${saleDate}`)
-        .text(`Item: ${sale.itemId.itemName}`)
-        .text(`Qty: ${sale.quantity}`)
-        .text(`Rate: ₹${sale.pricePerUnit}`)
-        .text(`Discount: ₹${sale.discount}`)
-        .text(`Total: ₹${sale.totalAmount}`)
+        .moveDown(0.2)
+        .font('Courier')
+        .text(`Invoice #: ${sale.invoiceNumber}`)
+        .text(`Date    : ${saleDate}`)
+        .text(`Cust    : ${sale.customerName}`)
+        .text('-----------------------------')
+        .font('Courier-Bold')
+        .text('Item        Qty  Rate   Amt')
+        .font('Courier')
+        .text(
+          `${sale.itemId.itemName.padEnd(12)} ${sale.quantity.toString().padEnd(4)} ₹${parseFloat(
+            sale.pricePerUnit
+          ).toFixed(2)} ₹${parseFloat(sale.totalAmount.replace(/[₹ ]/g, '')).toFixed(2)}`
+        )
+        .text('-----------------------------')
+        .text(`Discount : ₹${sale.discount}`)
+        .text(`Total    : ₹${sale.totalAmount}`)
+        .text('-----------------------------')
         .text(`By: ${sale.createdBy.name}`)
         .text(`Note: ${sale.description || '-'}`)
-        .text(`-------------------------------`)
-        .moveDown(0.5);
+        .text('=============================');
     });
 
     doc
-      .fontSize(12)
-      .text('Thank you!', { align: 'center' })
-      .moveDown(0.5);
+      .moveDown(0.5)
+      .font('Courier-Bold')
+      .text('Thank you for your purchase!', { align: 'center' })
+      .font('Courier')
+      .text('Visit Again', { align: 'center' });
 
     doc.end();
 
@@ -454,6 +468,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
+
 
 exports.downloadSalesReport = async (req, res) => {
   try {
