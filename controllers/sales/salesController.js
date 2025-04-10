@@ -403,7 +403,7 @@ async function updateInvoiceNumber(invoiceNumber) {
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
-      size: [210, 600 + invoiceDataArray.length * 200], // 58mm width, height grows with content
+      size: [210, 600 + invoiceDataArray.length * 50], // Expand height with items
       margins: { top: 10, bottom: 10, left: 10, right: 10 }
     });
 
@@ -414,52 +414,42 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     doc
       .fontSize(12)
       .font('Courier-Bold')
-      .text('MJ SALES STORE', { align: 'center' })
+      .text('SALES STORE', { align: 'center' })
       .fontSize(9)
-      .text('GSTIN: 1234567890', { align: 'center' })
-      .text('Phone: +91-9876543210', { align: 'center' })
       .text('-----------------------------');
 
-    invoiceDataArray.forEach((sale, index) => {
-      const saleDate = new Date(sale.saleDate).toLocaleString('en-US', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      });
-
-      doc
-        .moveDown(0.2)
-        .font('Courier')
-        .text(`Invoice #: ${sale.invoiceNumber}`)
-        .text(`Date    : ${saleDate}`)
-        .text(`Cust    : ${sale.customerName}`)
-        .text('-----------------------------')
-        .font('Courier-Bold')
-        .text('Item        Qty  Rate   Amt')
-        .font('Courier')
-        .text(
-          `${sale.itemId.itemName.padEnd(12)} ${sale.quantity.toString().padEnd(4)} ₹${parseFloat(
-            sale.pricePerUnit
-          ).toFixed(2)} ₹${parseFloat(sale.totalAmount.replace(/[₹ ]/g, '')).toFixed(2)}`
-        )
-        .text('-----------------------------')
-        .text(`Discount : ₹${sale.discount}`)
-        .text(`Total    : ₹${sale.totalAmount}`)
-        .text('-----------------------------')
-        .text(`By: ${sale.createdBy.name}`)
-        .text(`Note: ${sale.description || '-'}`)
-        .text('=============================');
-    });
+    let totalDiscount = 0;
+    let totalAmount = 0;
 
     doc
-      .moveDown(0.5)
       .font('Courier-Bold')
+      .text('Item         Qty  Rate   Amt')
+      .font('Courier');
+
+    invoiceDataArray.forEach((sale) => {
+      const itemName = sale.itemId.itemName;
+      const qty = sale.quantity.toString();
+      const rate = `₹${parseFloat(sale.pricePerUnit).toFixed(2)}`;
+      const amount = `₹${parseFloat(sale.totalAmount.replace(/[₹ ]/g, '')).toFixed(2)}`;
+
+      doc.text(
+        `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(6)} ₹${amount}`
+      );
+
+      totalDiscount += parseFloat(sale.discount);
+      totalAmount += parseFloat(amount);
+    });
+
+    doc.text('-----------------------------');
+
+    // TOTAL SECTION
+    doc
+      .font('Courier-Bold')
+      .text(`Discount : ₹${totalDiscount.toFixed(2)}`)
+      .text(`Total    : ₹${totalAmount.toFixed(2)}`)
+      .text('=============================')
+      .fontSize(10)
       .text('Thank you for your purchase!', { align: 'center' })
-      .font('Courier')
       .text('Visit Again', { align: 'center' });
 
     doc.end();
