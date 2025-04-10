@@ -123,7 +123,6 @@ exports.createSales = async (req, res) => {
       invoiceNumber,
       createdBy: req.user._id,
     });
-    console.log('sales', sales,saleDate);
     const sale = await SaleDummy.findById({ _id: sales._id })
       .populate({ path: 'itemId' })
       .populate({ path: 'createdBy' });
@@ -403,13 +402,19 @@ async function updateInvoiceNumber(invoiceNumber) {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({
+      size: [210, 600 + invoiceDataArray.length * 200], // A custom height depending on how many invoices
+      margins: { top: 10, bottom: 10, left: 10, right: 10 }
+    });
+
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
+
     doc
-      .fontSize(20)
-      .text('Combined Sales Invoice', { align: 'center' })
-      .moveDown();
+      .fontSize(14)
+      .text('*** Sales Invoice ***', { align: 'center' })
+      .moveDown(0.5);
+
     invoiceDataArray.forEach((sale, index) => {
       const saleDate = new Date(sale.saleDate).toLocaleString('en-US', {
         timeZone: 'Asia/Kolkata',
@@ -418,25 +423,30 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
         hour12: true,
       });
+
       doc
-        .fontSize(16)
-        .text(`Sale #${index + 1}`, { underline: true })
+        .fontSize(10)
+        .text(`-------------------------------`)
+        .text(`Invoice No: ${sale.invoiceNumber}`)
+        .text(`Customer: ${sale.customerName}`)
+        .text(`Date: ${saleDate}`)
+        .text(`Item: ${sale.itemId.itemName}`)
+        .text(`Qty: ${sale.quantity}`)
+        .text(`Rate: ₹${sale.pricePerUnit}`)
+        .text(`Discount: ₹${sale.discount}`)
+        .text(`Total: ₹${sale.totalAmount}`)
+        .text(`By: ${sale.createdBy.name}`)
+        .text(`Note: ${sale.description || '-'}`)
+        .text(`-------------------------------`)
         .moveDown(0.5);
-      doc.fontSize(12).text(`Invoice Number: ${sale.invoiceNumber}`);
-      doc.fontSize(12).text(`Customer Name: ${sale.customerName}`);
-      doc.fontSize(12).text(`Sale Date: ${saleDate}`);
-      doc.fontSize(12).text(`Item: ${sale.itemId.itemName}`);
-      doc.fontSize(12).text(`Quantity: ${sale.quantity}`);
-      doc.fontSize(12).text(`Price Per Unit: ₹${sale.pricePerUnit}`);
-      doc.fontSize(12).text(`Discount: ₹${sale.discount}`);
-      doc.fontSize(12).text(`Total Amount: ₹${sale.totalAmount}`);
-      doc.fontSize(12).text(`Description: ${sale.description}`);
-      doc.fontSize(12).text(`Created By: ${sale.createdBy.name}`);
-      doc.moveDown(1);
     });
+
+    doc
+      .fontSize(12)
+      .text('Thank you!', { align: 'center' })
+      .moveDown(0.5);
 
     doc.end();
 
