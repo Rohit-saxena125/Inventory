@@ -93,7 +93,7 @@ exports.getAllInventory = async (req, res, next) => {
       })
     );
     if (qty) {
-      inventory.result = inventory.result.filter((item) => item.quantity === 0);
+      inventory.result = inventory.result.filter((item) => item.quantity <= 0);
     }
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
