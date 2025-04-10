@@ -1,4 +1,5 @@
 const Sale = require('../../models/Sales/salesModel');
+const Inventory = require('../../models/inventory/inventoryModel');
 const SaleDummy = require('../../models/Sales/salesDummyModel');
 const InvoiceCounter = require('../../models/Sales/invoiceCounterModel');
 const {
@@ -503,47 +504,111 @@ exports.downloadSalesReport = async (req, res) => {
       search,
       type = 'Sales',
     } = req.body;
-    const query = { isDeleted: false };
-    if (userId) query.createdBy = userId;
-    if (startDate && endDate) {
-      query.saleDate = {
-        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
-        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
-      };
-    }
-    if (search) {
-      query.orderType = { $regex: search, $options: 'i' };
-    }
 
-    const sales = await Sale.find(query)
-      .populate('itemId')
-      .populate('createdBy');
-
-    if (!sales || sales.length === 0) {
-      return badRequestErrorResponse(
-        res,
-        'No sales data found for the given filters.'
+    if (type == "Sales") {
+      const query = { isDeleted: false, orderType: 'Sales' };
+      if (userId) {
+        query.createdBy = userId;
+      }
+      if (startDate && endDate) {
+        query.saleDate = {
+          $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+          $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+        };
+      }
+      const sales = await Sale.find(query)
+        .populate('itemId')
+        .populate('createdBy')
+        .sort({ createdAt: -1 });
+      const invoiceMap = new Map();
+      sales.forEach((sale) => {
+        const invoiceNumber = sale.invoiceNumber;
+        const price = parseFloat(sale.pricePerUnit || 0);
+        const qty = parseInt(sale.quantity, 10) || 0;
+        const amount = price * qty;
+        if (!invoiceMap.has(invoiceNumber)) {
+          invoiceMap.set(invoiceNumber, {
+            invoiceNumber,
+            saleDate: sale.saleDate,
+            customerName: sale.customerName,
+            createdBy: sale.createdBy.name,
+            quantity: qty,
+            itemName: sale.itemId.itemName,
+            pricePerUnit: price,
+            totalAmount: 0,
+          });
+        }
+        const invoiceData = invoiceMap.get(invoiceNumber);
+        invoiceData.totalAmount += amount;
+      });
+      const uniqueInvoices = Array.from(invoiceMap.values());
+      const fileName = `sales-report-${Date.now()}.${format}`;
+      const outputPath = path.join(__dirname, fileName);
+      if (format === 'pdf') {
+        await createSalesReportPDF(uniqueInvoices, headers, outputPath, type);
+      } else if (format === 'csv') {
+        await createSalesReportCSV(uniqueInvoices, headers, outputPath, type);
+      } else {
+        return badRequestErrorResponse(
+          res,
+          'Invalid format. Use "pdf" or "csv".'
+        );
+      }
+      const s3Url = await misData(outputPath);
+      fs.unlinkSync(outputPath);
+      return successResponse(res, 'Sales report downloaded successfully', s3Url);
+    } else if (type == "Inventory") {
+      const query = {};
+      if (startDate && endDate) {
+        query.saleDate = {
+          $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+          $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+        };
+      }
+      let inventory = await Inventory.find(query).sort({
+        createdAt: -1,
+      });
+      inventory = await Promise.all(
+        inventory.map(async (item) => {
+          const sales = await Sale.find({ itemId: item._id });
+          let quantity = 0;
+          let stockValue = 0;
+          sales.forEach((sale) => {
+            const pricePerUnit = parseFloat(sale.pricePerUnit);
+            if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
+              quantity += parseInt(sale.quantity, 10);
+              stockValue += quantity * pricePerUnit;
+            } else if (
+              sale.orderType === 'Sales' ||
+              sale.orderType === 'Reduce'
+            ) {
+              quantity -= parseInt(sale.quantity, 10);
+              stockValue -= quantity * pricePerUnit;
+            }
+          });
+          return {
+            ...item.toObject(),
+            quantity: quantity,
+            stockValue: stockValue.toFixed(2),
+          };
+        })
       );
+      const fileName = `inventory-report-${Date.now()}.${format}`;
+      const outputPath = path.join(__dirname, fileName);
+      if (format === 'pdf') {
+        await createSalesReportPDF(inventory, headers, outputPath, type);
+      } else if (format === 'csv') {
+        await createSalesReportCSV(inventory, headers, outputPath, type);
+      } else {
+        return badRequestErrorResponse(
+          res,
+          'Invalid format. Use "pdf" or "csv".'
+        );
+      }
+      const s3Url = await misData(outputPath);
+      fs.unlinkSync(outputPath);
+      return successResponse(res, 'Inventory report downloaded successfully', s3Url);
     }
-
-    const fileName = `sales-report-${Date.now()}.${format}`;
-    const outputPath = path.join(__dirname, fileName);
-
-    if (format === 'pdf') {
-      await createSalesReportPDF(sales, headers, outputPath);
-    } else if (format === 'csv') {
-      await createSalesReportCSV(sales, headers, outputPath);
-    } else {
-      return badRequestErrorResponse(
-        res,
-        'Invalid format. Use "pdf" or "csv".'
-      );
-    }
-
-    const s3Url = await misData(outputPath);
-    fs.unlinkSync(outputPath); // Clean up temp file
-
-    return successResponse(res, 'Sales report downloaded successfully', s3Url);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
@@ -559,7 +624,7 @@ const DEFAULT_HEADERS = [
 ];
 
 // PDF Generator
-async function createSalesReportPDF(salesData, headers, outputPath) {
+async function createSalesReportPDF(salesData, headers, outputPath, type) {
   if (!headers || headers.length === 0) headers = DEFAULT_HEADERS;
 
   return new Promise((resolve, reject) => {
@@ -567,7 +632,7 @@ async function createSalesReportPDF(salesData, headers, outputPath) {
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
-    doc.fontSize(18).text('Sales Report', { align: 'center' }).moveDown();
+    doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown();
 
     salesData.forEach((sale) => {
       headers.forEach((header) => {
