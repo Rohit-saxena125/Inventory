@@ -285,11 +285,11 @@ exports.reportInventory = async (req, res, next) => {
       query.isDeleted = false;
       query.orderType = 'Sales';
       query.createdBy = userId;
+      console.log('query', query);
       const sales = await Sale.find(query);
       console.log('sales', sales);
       const uniqueInvoices = new Set();
       let totalSalesAmount = 0;
-
       sales.forEach((sale) => {
         const price = parseFloat(sale.pricePerUnit) || 0;
         const qty = parseInt(sale.quantity, 10) || 0;
