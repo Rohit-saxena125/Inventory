@@ -89,7 +89,7 @@ exports.getAllInventory = async (req, res, next) => {
         return {
           ...item.toObject(),
           quantity: quantity ,
-          stockValue: stockValue.toFixed(2),
+          stockValue: parseFloat(stockValue.toFixed(2)),
         };
       })
     );
