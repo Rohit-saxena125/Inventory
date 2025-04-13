@@ -229,11 +229,11 @@ exports.reportInventory = async (req, res, next) => {
                 totalStockValue: {
                   $sum: {
                     $cond: [
-                      { $in: ['$OrderType', ['Opening', 'Add']] },
+                      { $in: ['$orderType', ['Opening', 'Add']] },
                       { $multiply: ['$quantity', '$pricePerUnit'] },
                       {
                         $cond: [
-                          { $in: ['$OrderType', ['Reduce', 'Sales']] },
+                          { $in: ['$orderType', ['Reduce', 'Sales']] },
                           { $multiply: [{ $multiply: ['$quantity', '$pricePerUnit'] }, -1] },
                           0
                         ]
