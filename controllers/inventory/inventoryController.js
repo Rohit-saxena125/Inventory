@@ -73,21 +73,22 @@ exports.getAllInventory = async (req, res, next) => {
         let quantity = 0;
         let stockValue = 0;
         sales.forEach((sale) => {
+          const quantitySet = parseInt(sale.quantity, 10) || 0;
           const pricePerUnit = parseFloat(sale.pricePerUnit);
           if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
-            quantity += parseInt(sale.quantity, 10);
-            stockValue += quantity * pricePerUnit;
+            quantity += quantitySet;
+            stockValue += quantitySet * pricePerUnit;
           } else if (
             sale.orderType === 'Sales' ||
             sale.orderType === 'Reduce'
           ) {
-            quantity -= parseInt(sale.quantity, 10);
-            stockValue -= quantity * pricePerUnit;
+            quantity -= quantitySet;
+            stockValue -= quantitySet * pricePerUnit;
           }
         });
         return {
           ...item.toObject(),
-          quantity:  quantity ,
+          quantity: quantity ,
           stockValue: stockValue.toFixed(2),
         };
       })
