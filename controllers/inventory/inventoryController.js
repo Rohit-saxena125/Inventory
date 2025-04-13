@@ -230,11 +230,26 @@ exports.reportInventory = async (req, res, next) => {
                   $sum: {
                     $cond: [
                       { $in: ['$orderType', ['Opening', 'Add']] },
-                      { $multiply: ['$quantity', '$pricePerUnit'] },
+                      {
+                        $multiply: [
+                          { $toDouble: '$quantity' },
+                          { $toDouble: '$pricePerUnit' }
+                        ]
+                      },
                       {
                         $cond: [
                           { $in: ['$orderType', ['Reduce', 'Sales']] },
-                          { $multiply: [{ $multiply: ['$quantity', '$pricePerUnit'] }, -1] },
+                          {
+                            $multiply: [
+                              {
+                                $multiply: [
+                                  { $toDouble: '$quantity' },
+                                  { $toDouble: '$pricePerUnit' }
+                                ]
+                              },
+                              -1
+                            ]
+                          },
                           0
                         ]
                       }
@@ -243,7 +258,7 @@ exports.reportInventory = async (req, res, next) => {
                 }
               }
             }
-          ]),
+          ]),     
           Inventory.find(query),
         ]
       );
