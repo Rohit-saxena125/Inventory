@@ -85,6 +85,7 @@ exports.getAllInventory = async (req, res, next) => {
             stockValue -= quantitySet * pricePerUnit;
           }else if(sale.orderType === 'Sales'){
             quantity -= quantitySet;
+            stockValue -= quantitySet * pricePerUnit;
           }
         });
         return {
@@ -129,6 +130,7 @@ exports.getInventoryById = async (req, res, next) => {
         inventory.stockValue -= quantity * pricePerUnit;
       }else if(sale.orderType === 'Sales' ){
         inventory.quantity -= quantity;
+        stockValue -= quantitySet * pricePerUnit;
       }
     });
     inventory.stockValue =

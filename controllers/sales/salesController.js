@@ -615,6 +615,7 @@ exports.downloadSalesReport = async (req, res) => {
             }
             if(sale.orderType === 'Sales'){
               quantity -= parseInt(sale.quantity, 10);
+              stockValue -= quantity * pricePerUnit;
             }
           });
           return {
@@ -654,13 +655,14 @@ exports.downloadSalesReport = async (req, res) => {
 };
 
 const DEFAULT_HEADERS = [
-  'saleDate',
+  'Serial Number',
   'itemId',
-  'quantity',
-  'stock value',
   'salesPrice',
   'purchasePrice',
+  'quantity',
+  'stock value',
 ];
+
 
 async function createSalesReportPDF(data, headers, outputPath, type) {
   return new Promise((resolve, reject) => {
@@ -688,35 +690,39 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     y += rowHeight;
 
     // Draw data rows
-    data.forEach((entry) => {
+    data.forEach((entry, index) => {
       headers.forEach((header, i) => {
         doc
           .font('Helvetica')
           .fontSize(10)
-          .text(getValueByHeader(entry, header), 30 + i * columnWidth, y, {
+          .text(getValueByHeader(entry, header, index), 30 + i * columnWidth, y, {
             width: columnWidth,
             align: 'left',
           });
       });
       y += rowHeight;
-
+    
       // Handle page overflow
       if (y > doc.page.height - 50) {
         doc.addPage();
         y = 50;
       }
     });
+    
 
     doc.end();
     stream.on('finish', () => resolve(outputPath));
     stream.on('error', reject);
   });
 }
-
-function getValueByHeader(entry, header) {
+function getValueByHeader(entry, header, index = 0) {
   switch (header) {
+    case 'Serial Number':
+      return index + 1; // 1-based serial number
     case 'saleDate':
-      return entry.saleDate ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A') : '-';
+      return entry.saleDate
+        ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
+        : '-';
     case 'itemId':
       return entry.itemId || '-';
     case 'quantity':
