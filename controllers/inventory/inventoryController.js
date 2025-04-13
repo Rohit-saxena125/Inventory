@@ -68,31 +68,32 @@ exports.getAllInventory = async (req, res, next) => {
     }
     const inventory = await pagination(Inventory, query, page, limit);
     inventory.result = await Promise.all(
-      inventory.result.map(async (item) => {
+      inventory.result.map(async (itemDoc) => {
+        const item = itemDoc.toObject();
         const sales = await Sale.find({ itemId: item._id });
         let quantity = 0;
         let stockValue = 0;
+    
         sales.forEach((sale) => {
           const quantitySet = parseInt(sale.quantity, 10) || 0;
-          const pricePerUnit = parseFloat(sale.pricePerUnit);
+          const pricePerUnit = parseFloat(sale.pricePerUnit) || 0;
+    
           if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
             quantity += quantitySet;
             stockValue += quantitySet * pricePerUnit;
-          } else if (
-            sale.orderType === 'Sales' ||
-            sale.orderType === 'Reduce'
-          ) {
+          } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
             quantity -= quantitySet;
             stockValue -= quantitySet * pricePerUnit;
           }
         });
+    
         return {
-          ...item.toObject(),
-          quantity: quantity ,
+          ...item,
+          quantity,
           stockValue: parseFloat(stockValue.toFixed(2)),
         };
       })
-    );
+    );    
     if (qty) {
       inventory.result = inventory.result.filter((item) => item.quantity <= 0);
     }
