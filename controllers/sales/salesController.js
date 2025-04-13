@@ -525,19 +525,25 @@ exports.downloadSalesReport = async (req, res) => {
         const price = parseFloat(sale.pricePerUnit || 0);
         const qty = parseInt(sale.quantity, 10) || 0;
         const amount = price * qty;
+      
         if (!invoiceMap.has(invoiceNumber)) {
           invoiceMap.set(invoiceNumber, {
             invoiceNumber,
             saleDate: sale.saleDate,
-            customerName: sale.customerName ? sale.customerName : '-',
-            createdBy: sale.createdBy.name,
-            quantity: qty,
-            itemName: sale.itemId.itemName,
-            pricePerUnit: price,
+            customerName: sale.customerName || '-',
+            createdBy: sale.createdBy?.name || '-',
             totalAmount: 0,
+            items: [],
           });
         }
+      
         const invoiceData = invoiceMap.get(invoiceNumber);
+        invoiceData.items.push({
+          itemName: sale.itemId?.itemName || '-',
+          quantity: qty,
+          pricePerUnit: price,
+          amount: amount.toFixed(2),
+        });
         invoiceData.totalAmount += amount;
       });
       let reportHeaders = [
@@ -602,11 +608,13 @@ exports.downloadSalesReport = async (req, res) => {
               quantity += parseInt(sale.quantity, 10);
               stockValue += quantity * pricePerUnit;
             } else if (
-              sale.orderType === 'Sales' ||
               sale.orderType === 'Reduce'
             ) {
               quantity -= parseInt(sale.quantity, 10);
               stockValue -= quantity * pricePerUnit;
+            }
+            if(sale.orderType === 'Sales'){
+              quantity -= parseInt(sale.quantity, 10);
             }
           });
           return {
@@ -644,6 +652,7 @@ exports.downloadSalesReport = async (req, res) => {
     return internalServerErrorResponse(res, error);
   }
 };
+
 const DEFAULT_HEADERS = [
   'saleDate',
   'itemId',
@@ -652,20 +661,50 @@ const DEFAULT_HEADERS = [
   'salesPrice',
   'purchasePrice',
 ];
+
 async function createSalesReportPDF(data, headers, outputPath, type) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 30 });
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
-    doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown();
+    doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
 
+    const columnWidth = 520 / headers.length;
+    const rowHeight = 20;
+    let y = doc.y;
+
+    // Draw headers
+    headers.forEach((header, i) => {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(header, 30 + i * columnWidth, y, {
+          width: columnWidth,
+          align: 'left',
+        });
+    });
+
+    y += rowHeight;
+
+    // Draw data rows
     data.forEach((entry) => {
-      headers.forEach((header) => {
-        const value = getValueByHeader(entry, header);
-        doc.fontSize(12).text(`${header}: ${value}`);
+      headers.forEach((header, i) => {
+        doc
+          .font('Helvetica')
+          .fontSize(10)
+          .text(getValueByHeader(entry, header), 30 + i * columnWidth, y, {
+            width: columnWidth,
+            align: 'left',
+          });
       });
-      doc.moveDown();
+      y += rowHeight;
+
+      // Handle page overflow
+      if (y > doc.page.height - 50) {
+        doc.addPage();
+        y = 50;
+      }
     });
 
     doc.end();
@@ -674,16 +713,6 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
   });
 }
 
-// CSV Generator
-async function createSalesReportCSV(data, headers, outputPath) {
-  const rows = data.map((entry) =>
-    headers.map((header) => `"${getValueByHeader(entry, header)}"`).join(',')
-  );
-  const csvContent = [headers.join(','), ...rows].join('\n');
-  fs.writeFileSync(outputPath, csvContent);
-}
-
-// Helper
 function getValueByHeader(entry, header) {
   switch (header) {
     case 'saleDate':

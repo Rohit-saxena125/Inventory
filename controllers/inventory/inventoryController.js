@@ -68,32 +68,32 @@ exports.getAllInventory = async (req, res, next) => {
     }
     const inventory = await pagination(Inventory, query, page, limit);
     inventory.result = await Promise.all(
-      inventory.result.map(async (itemDoc) => {
-        const item = itemDoc.toObject();
+      inventory.result.map(async (item) => {
         const sales = await Sale.find({ itemId: item._id });
         let quantity = 0;
         let stockValue = 0;
-    
         sales.forEach((sale) => {
           const quantitySet = parseInt(sale.quantity, 10) || 0;
-          const pricePerUnit = parseFloat(sale.pricePerUnit) || 0;
-    
+          const pricePerUnit = parseFloat(sale.pricePerUnit);
           if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
             quantity += quantitySet;
             stockValue += quantitySet * pricePerUnit;
-          } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
+          } else if (
+            sale.orderType === 'Reduce'
+          ) {
             quantity -= quantitySet;
             stockValue -= quantitySet * pricePerUnit;
+          }else if(sale.orderType === 'Sales'){
+            quantity -= quantitySet;
           }
         });
-    
         return {
-          ...item,
-          quantity,
+          ...item.toObject(),
+          quantity: quantity ,
           stockValue: parseFloat(stockValue.toFixed(2)),
         };
       })
-    );    
+    );
     if (qty) {
       inventory.result = inventory.result.filter((item) => item.quantity <= 0);
     }
@@ -124,9 +124,11 @@ exports.getInventoryById = async (req, res, next) => {
       if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
         inventory.quantity += quantity;
         inventory.stockValue += quantity * pricePerUnit;
-      } else if (sale.orderType === 'Sales' || sale.orderType === 'Reduce') {
+      } else if ( sale.orderType === 'Reduce') {
         inventory.quantity -= quantity;
         inventory.stockValue -= quantity * pricePerUnit;
+      }else if(sale.orderType === 'Sales' ){
+        inventory.quantity -= quantity;
       }
     });
     inventory.stockValue =
