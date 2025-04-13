@@ -130,7 +130,7 @@ exports.getInventoryById = async (req, res, next) => {
         inventory.stockValue -= quantity * pricePerUnit;
       }else if(sale.orderType === 'Sales' ){
         inventory.quantity -= quantity;
-        stockValue -= quantitySet * pricePerUnit;
+        inventory.stockValue -= quantity * pricePerUnit;
       }
     });
     inventory.stockValue =
@@ -221,32 +221,28 @@ exports.reportInventory = async (req, res, next) => {
       const [noOFItems, totalStockValue, allInventoryItems] = await Promise.all(
         [
           Inventory.countDocuments(query),
-          Inventory.aggregate([
+          Sale.aggregate([
             { $match: query },
-            {
-              $lookup: {
-                from: 'sales',
-                localField: '_id',
-                foreignField: 'itemId',
-                as: 'sales',
-              },
-            },
-            {
-              $unwind: '$sales',
-            },
             {
               $group: {
                 _id: null,
                 totalStockValue: {
                   $sum: {
-                    $multiply: [
-                      { $toDouble: '$sales.quantity' },
-                      { $toDouble: '$sales.pricePerUnit' },
-                    ],
-                  },
-                },
-              },
-            },
+                    $cond: [
+                      { $in: ['$OrderType', ['Opening', 'Add']] },
+                      { $multiply: ['$quantity', '$pricePerUnit'] },
+                      {
+                        $cond: [
+                          { $in: ['$OrderType', ['Reduce', 'Sales']] },
+                          { $multiply: [{ $multiply: ['$quantity', '$pricePerUnit'] }, -1] },
+                          0
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
           ]),
           Inventory.find(query),
         ]
