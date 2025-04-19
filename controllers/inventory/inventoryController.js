@@ -48,7 +48,16 @@ exports.createInventory = async (req, res, next) => {
 
 exports.getAllInventory = async (req, res, next) => {
   try {
-    const { page, limit, search, startDate, endDate, qty, outOfStock, inActive } = req.query;
+    const {
+      page,
+      limit,
+      search,
+      startDate,
+      endDate,
+      qty,
+      outOfStock,
+      inActive,
+    } = req.query;
     const query = {};
     if (startDate && endDate) {
       query.createdAt = {
@@ -69,8 +78,13 @@ exports.getAllInventory = async (req, res, next) => {
     let inventory = await pagination(Inventory, query, page, limit);
     inventory.result = await Promise.all(
       inventory.result.map(async (item) => {
-        const openingStock = await Sale.findOne({ orderType: 'Opening', itemId: item._id }).sort({ createdAt: 1 });
-        const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 });
+        const openingStock = await Sale.findOne({
+          orderType: 'Opening',
+          itemId: item._id,
+        }).sort({ createdAt: -1 });
+        const sales = await Sale.find({ itemId: item._id }).sort({
+          createdAt: 1,
+        });
         let currentQuantity = 0;
         let currentStockValue = 0;
         let lastSaleDate = null;
@@ -103,28 +117,27 @@ exports.getAllInventory = async (req, res, next) => {
           currentQuantity = currentQuantity;
           currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
         });
-
         return {
           ...item.toObject(),
           quantity: currentQuantity,
           stockValue: parseFloat(currentStockValue.toFixed(2)),
           isOutOfStock: currentQuantity <= 0,
-          isBelowMinQty: currentQuantity <= openingStock.minQty ?true : false,
-          isInactive: lastSaleDate ? moment().diff(moment(lastSaleDate), 'days') > 60 : false
+          isBelowMinQty:
+            currentQuantity <= parseInt(openingStock.minQty) ? true : false,
+          isInactive: lastSaleDate
+            ? moment().diff(moment(lastSaleDate), 'days') > 60
+            : false,
         };
       })
     );
-    console.log(inventory);
-    if (qty === 'true') {
-      inventory.result = inventory.result.filter(item => item.isBelowMinQty);
-      console.log(inventory.result);
+    if (qty) {
+      inventory.result = inventory.result.filter((item) => item.isBelowMinQty);
     }
-    if (outOfStock === 'true') {
-      inventory.result = inventory.result.filter(item => item.isOutOfStock);
-      console.log(inventory.result);
+    if (outOfStock) {
+      inventory.result = inventory.result.filter((item) => item.isOutOfStock);
     }
-    if (inActive === 'true') {
-      inventory.result = inventory.result.filter(item => item.isInactive);
+    if (inActive) {
+      inventory.result = inventory.result.filter((item) => item.isInactive);
     }
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
@@ -167,10 +180,10 @@ exports.getInventoryById = async (req, res, next) => {
       currentQuantity = currentQuantity;
       currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
     });
-    const openingStock = sales.find(s => s.orderType === 'Opening');
+    const openingStock = sales.find((s) => s.orderType === 'Opening');
     inventory = inventory.toObject();
     inventory.openingStock = openingStock;
-    inventory.stockValue = parseFloat(currentStockValue.toFixed(2))
+    inventory.stockValue = parseFloat(currentStockValue.toFixed(2));
     inventory.quantity = currentQuantity;
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
@@ -242,7 +255,9 @@ exports.deleteInventory = async (req, res, next) => {
 
 exports.reportInventory = async (req, res, next) => {
   try {
-    const { startDate, endDate, type, userId } = req.query;
+    const { startDate, endDate, type, userId,qty,
+      outOfStock,
+      inActive, } = req.query;
     let query = {};
     if (startDate && endDate) {
       query.createdAt = {
@@ -256,15 +271,24 @@ exports.reportInventory = async (req, res, next) => {
     }
     if (type == 'Inventory') {
       const allInventoryItems = await Inventory.find(query);
-      const inventoryCalculations = await Promise.all(
+      let inventoryCalculations = await Promise.all(
         allInventoryItems.map(async (item) => {
-          let openingStock = await Sale.findOne({ orderType: 'Opening', itemId: item._id }).sort({ createdAt: 1 });
-          const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 });
+          let openingStock = await Sale.findOne({
+            orderType: 'Opening',
+            itemId: item._id,
+          }).sort({ createdAt: 1 });
+          const sales = await Sale.find({ itemId: item._id }).sort({
+            createdAt: 1,
+          });
           let currentQuantity = 0;
           let currentStockValue = 0;
+          let lastSaleDate = null;
           sales.forEach((sale) => {
             const quantity = parseInt(sale.quantity, 10) || 0;
             const pricePerUnit = parseFloat(sale.pricePerUnit);
+            if (sale.orderType === 'Sales' && lastSaleDate === null) {
+              lastSaleDate = sale.createdAt;
+            }
             switch (sale.orderType) {
               case 'Opening':
               case 'Add':
@@ -290,17 +314,31 @@ exports.reportInventory = async (req, res, next) => {
             item,
             quantity: currentQuantity,
             stockValue: currentStockValue,
-            isLowStock: currentQuantity <= openingStock.minQty,
+            isOutOfStock: currentQuantity <= 0,
+            isBelowMinQty:
+              currentQuantity <= parseInt(openingStock.minQty) ? true : false,
+            isInactive: lastSaleDate
+              ? moment().diff(moment(lastSaleDate), 'days') > 60
+              : false,
           };
         })
       );
+      if (qty) {
+        inventoryCalculations = inventoryCalculations.filter((item) => item.isBelowMinQty);
+      }
+      if (outOfStock) {
+        inventoryCalculations = inventoryCalculations.filter((item) => item.isOutOfStock);
+      }
+      if (inActive) {
+        inventoryCalculations = inventoryCalculations.filter((item) => item.isInactive);
+      }
       const noOFItems = inventoryCalculations.length;
       const totalStockValue = inventoryCalculations.reduce(
         (sum, calc) => sum + calc.stockValue,
         0
       );
       const lowStockCount = inventoryCalculations.filter(
-        calc => calc.isLowStock
+        (item) => item.isBelowMinQty
       ).length;
       return successResponse(res, 'Inventory report fetched successfully', {
         noOFItems: noOFItems,
