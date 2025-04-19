@@ -13,6 +13,7 @@ const { misData } = require('../../middlewares/upload/upload');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
+const { console } = require('inspector');
 
 exports.fetchSales = async (req, res) => {
   try {
@@ -848,6 +849,7 @@ exports.downloadSalesReport = async (req, res) => {
       });
       inventory = await Promise.all(
         inventory.map(async (item) => {
+          console.log('Item:', item);
           const sales = await Sale.find({ itemId: item._id }).sort({
             createdAt: 1,
           }); // Sort by creation date
