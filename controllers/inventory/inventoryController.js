@@ -278,7 +278,6 @@ exports.reportInventory = async (req, res, next) => {
           };
         })
       );
-      console.log(inventoryCalculations);
       const noOFItems = inventoryCalculations.length;
       const totalStockValue = inventoryCalculations.reduce(
         (sum, calc) => sum + calc.stockValue,
@@ -287,6 +286,9 @@ exports.reportInventory = async (req, res, next) => {
       const lowStockCount = inventoryCalculations.filter(
         calc => calc.isLowStock
       ).length;
+      console.log('lowStockCount', lowStockCount);
+      console.log('totalStockValue', totalStockValue);
+      console.log('noOFItems', noOFItems);
       return successResponse(res, 'Inventory report fetched successfully', {
         noOFItems,
         totalStockValue: parseFloat(totalStockValue.toFixed(2)),
