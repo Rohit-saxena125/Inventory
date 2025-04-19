@@ -240,8 +240,10 @@ exports.reportInventory = async (req, res, next) => {
     }
     if (type == 'Inventory') {
       const allInventoryItems = await Inventory.find(query);
+     
       const inventoryCalculations = await Promise.all(
         allInventoryItems.map(async (item) => {
+          let openingStock = await Sale.findOne({ orderType: 'Opening' ,itemId: item._id }).sort({ createdAt: 1 });
           const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 });
           let currentQuantity = 0;
           let currentStockValue = 0;
@@ -273,7 +275,7 @@ exports.reportInventory = async (req, res, next) => {
             item,
             quantity: currentQuantity,
             stockValue: currentStockValue,
-            isLowStock: currentQuantity <= 0
+            isLowStock: currentQuantity <= openingStock.minQty,
           };
         })
       );
