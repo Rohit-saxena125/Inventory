@@ -114,6 +114,7 @@ exports.getAllInventory = async (req, res, next) => {
         };
       })
     );
+    console.log(inventory);
     if (qty =='true') {
       inventory.result = inventory.result.filter(item => item.isBelowMinQty);
     }
