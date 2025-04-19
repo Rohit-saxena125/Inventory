@@ -316,10 +316,11 @@ exports.deleteSalesAll = async (req, res) => {
     }
     if (invoiceNumber) {
       query.invoiceNumber = invoiceNumber;
-      
     }
     const sales = await Sale.find(query);
-    const invoiceNumbers = [...new Set(sales.map(sale => sale.invoiceNumber))];
+    const invoiceNumbers = [
+      ...new Set(sales.map((sale) => sale.invoiceNumber)),
+    ];
     await Sale.updateMany(
       query,
       { $set: { isDeleted: true } },
@@ -336,7 +337,10 @@ exports.deleteSalesAll = async (req, res) => {
   }
 };
 async function generateInvoiceNumber() {
-  const latestSale = await Sale.findOne({ orderType: 'Sales',isDeleted:false }).sort({
+  const latestSale = await Sale.findOne({
+    orderType: 'Sales',
+    isDeleted: false,
+  }).sort({
     _id: -1,
   });
   if (latestSale && !isNaN(latestSale.invoiceNumber)) {
@@ -504,6 +508,266 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
   });
 }
 
+// exports.downloadSalesReport = async (req, res) => {
+//   try {
+//     const {
+//       format = 'pdf',
+//       headers = [],
+//       startDate,
+//       endDate,
+//       userId,
+//       search,
+//       type = 'Sale',
+//     } = req.body;
+//     if (type == 'Sale') {
+//       const query = { isDeleted: false, orderType: 'Sales' };
+//       if (userId) {
+//         query.createdBy = userId;
+//       }
+//       if (startDate && endDate) {
+//         query.saleDate = {
+//           $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+//           $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+//         };
+//       }
+//       const sales = await Sale.find(query)
+//         .populate('itemId')
+//         .populate('createdBy')
+//         .sort({ createdAt: -1 });
+//       const invoiceMap = new Map();
+//       sales.forEach((sale) => {
+//         const invoiceNumber = sale.invoiceNumber;
+//         const price = parseFloat(sale.pricePerUnit || 0);
+//         const qty = parseInt(sale.quantity, 10) || 0;
+//         const amount = price * qty;
+
+//         if (!invoiceMap.has(invoiceNumber)) {
+//           invoiceMap.set(invoiceNumber, {
+//             invoiceNumber,
+//             saleDate: sale.saleDate,
+//             customerName: sale.customerName || '-',
+//             createdBy: sale.createdBy?.name || '-',
+//             totalAmount: 0,
+//             items: [],
+//           });
+//         }
+
+//         const invoiceData = invoiceMap.get(invoiceNumber);
+//         invoiceData.items.push({
+//           itemName: sale.itemId?.itemName || '-',
+//           quantity: qty,
+//           pricePerUnit: price,
+//           amount: amount.toFixed(2),
+//         });
+//         invoiceData.totalAmount += amount;
+//       });
+//       let reportHeaders = [
+//         'invoiceNumber',
+//         'saleDate',
+//         'customerName',
+//         'createdBy',
+//         'quantity',
+//         'itemName',
+//         'pricePerUnit',
+//         'totalAmount',
+//       ];
+//       const uniqueInvoices = Array.from(invoiceMap.values());
+//       const fileName = `sales-report-${Date.now()}.${format}`;
+//       const outputPath = path.join(__dirname, fileName);
+//       if (format === 'pdf') {
+//         await createSalesReportPDF(
+//           uniqueInvoices,
+//           reportHeaders,
+//           outputPath,
+//           type
+//         );
+//       } else if (format === 'csv') {
+//         await createSalesReportCSV(
+//           uniqueInvoices,
+//           reportHeaders,
+//           outputPath,
+//           type
+//         );
+//       } else {
+//         return badRequestErrorResponse(
+//           res,
+//           'Invalid format. Use "pdf" or "csv".'
+//         );
+//       }
+//       const s3Url = await misData(outputPath);
+//       fs.unlinkSync(outputPath);
+//       return successResponse(
+//         res,
+//         'Sales report downloaded successfully',
+//         s3Url
+//       );
+//     } else if (type == 'Inventory') {
+//       const query = {};
+//       if (startDate && endDate) {
+//         query.saleDate = {
+//           $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
+//           $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+//         };
+//       }
+//       let inventory = await Inventory.find(query).sort({
+//         createdAt: -1,
+//       });
+//       inventory = await Promise.all(
+//         inventory.map(async (item) => {
+//           const sales = await Sale.find({ itemId: item._id });
+//           let quantity = 0;
+//           let stockValue = 0;
+//           sales.forEach((sale) => {
+//             const pricePerUnit = parseFloat(sale.pricePerUnit);
+//             if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
+//               quantity += parseInt(sale.quantity, 10);
+//               stockValue += quantity * pricePerUnit;
+//             } else if (
+//               sale.orderType === 'Reduce'
+//             ) {
+//               quantity -= parseInt(sale.quantity, 10);
+//               stockValue -= quantity * pricePerUnit;
+//             }
+//             if(sale.orderType === 'Sales'){
+//               quantity -= parseInt(sale.quantity, 10);
+//               stockValue -= quantity * pricePerUnit;
+//             }
+//           });
+//           return {
+//             saleDate: item.createdAt,
+//             itemId: item.itemName,
+//             quantity: quantity,
+//             salesPrice: item.salePrice || 0,
+//             purchasePrice: item.purchasePrice || 0,
+//             'stock value': stockValue.toFixed(2),
+//           };
+//         })
+//       );
+//       const reportHeaders = headers.length > 0 ? headers : DEFAULT_HEADERS;
+//       const fileName = `inventory-report-${Date.now()}.${format}`;
+//       const outputPath = path.join(__dirname, fileName);
+//       if (format === 'pdf') {
+//         await createSalesReportPDF(inventory, reportHeaders, outputPath, type);
+//       } else if (format === 'csv') {
+//         await createSalesReportCSV(inventory, reportHeaders, outputPath, type);
+//       } else {
+//         return badRequestErrorResponse(
+//           res,
+//           'Invalid format. Use "pdf" or "csv".'
+//         );
+//       }
+//       const s3Url = await misData(outputPath);
+//       fs.unlinkSync(outputPath);
+//       return successResponse(
+//         res,
+//         'Inventory report downloaded successfully',
+//         s3Url
+//       );
+//     }
+//   } catch (error) {
+//     return internalServerErrorResponse(res, error);
+//   }
+// };
+
+// const DEFAULT_HEADERS = [
+//   'Serial Number',
+//   'Item Name',
+//   'Sales Price',
+//   'Purchase Price',
+//   'Stock Quantity',
+//   'Stock Value',
+// ];
+
+// async function createSalesReportPDF(data, headers, outputPath, type) {
+//   return new Promise((resolve, reject) => {
+//     const doc = new PDFDocument({ margin: 30, size: 'A4' });
+//     const stream = fs.createWriteStream(outputPath);
+//     doc.pipe(stream);
+
+//     doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
+
+//     const columnWidth = 520 / headers.length;
+//     const rowHeight = 20;
+//     let y = doc.y;
+//     headers.forEach((header, i) => {
+//       doc
+//         .font('Helvetica-Bold')
+//         .fontSize(10)
+//         .text(header, 30 + i * columnWidth, y, {
+//           width: columnWidth,
+//           align: 'left',
+//         });
+//     });
+
+//     y += rowHeight;
+//     data.forEach((entry, index) => {
+//       headers.forEach((header, i) => {
+//         doc
+//           .font('Helvetica')
+//           .fontSize(10)
+//           .text(getValueByHeader(entry, header, index), 30 + i * columnWidth, y, {
+//             width: columnWidth,
+//             align: 'left',
+//           });
+//       });
+//       y += rowHeight;
+//       if (y > doc.page.height - 50) {
+//         doc.addPage();
+//         y = 50;
+//       }
+//     });
+
+//     doc.end();
+//     stream.on('finish', () => resolve(outputPath));
+//     stream.on('error', reject);
+//   });
+// }
+// function getValueByHeader(entry, header, index = 0) {
+//   switch (header) {
+//     case 'Serial Number':
+//       return index + 1;
+//     case 'saleDate':
+//       return entry.saleDate
+//         ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
+//         : '-';
+//     case 'itemId':
+//       return entry.itemId || '-';
+//     case 'quantity':
+//       return entry.quantity || 0;
+//     case 'pricePerUnit':
+//       return entry.pricePerUnit || 0;
+//     case 'stock value':
+//       return entry['stock value'] || '0.00';
+//     case 'salesPrice':
+//       return entry.salesPrice || '-';
+//     case 'purchasePrice':
+//       return entry.purchasePrice || '-';
+//     case 'invoiceNumber':
+//       return entry.invoiceNumber || '-';
+//     case 'customerName':
+//       return entry.customerName || '-';
+//     case 'createdBy':
+//       return entry.createdBy || '-';
+//     case 'itemName':
+//       return entry.itemName || '-';
+//     case 'totalAmount':
+//       return entry.totalAmount?.toFixed(2) || '0.00';
+//     default:
+//       return '-';
+//   }
+// }
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
+const moment = require('moment-timezone');
+const { Sale, Inventory } = require('../models'); // Adjust path as needed
+const { misData } = require('../services/aws'); // Adjust path as needed
+const {
+  successResponse,
+  badRequestErrorResponse,
+  internalServerErrorResponse,
+} = require('../utils/response'); // Adjust path as needed
+
 exports.downloadSalesReport = async (req, res) => {
   try {
     const {
@@ -515,7 +779,8 @@ exports.downloadSalesReport = async (req, res) => {
       search,
       type = 'Sale',
     } = req.body;
-    if (type == 'Sale') {
+
+    if (type === 'Sale') {
       const query = { isDeleted: false, orderType: 'Sales' };
       if (userId) {
         query.createdBy = userId;
@@ -530,13 +795,14 @@ exports.downloadSalesReport = async (req, res) => {
         .populate('itemId')
         .populate('createdBy')
         .sort({ createdAt: -1 });
+
       const invoiceMap = new Map();
       sales.forEach((sale) => {
         const invoiceNumber = sale.invoiceNumber;
         const price = parseFloat(sale.pricePerUnit || 0);
         const qty = parseInt(sale.quantity, 10) || 0;
         const amount = price * qty;
-      
+
         if (!invoiceMap.has(invoiceNumber)) {
           invoiceMap.set(invoiceNumber, {
             invoiceNumber,
@@ -547,7 +813,7 @@ exports.downloadSalesReport = async (req, res) => {
             items: [],
           });
         }
-      
+
         const invoiceData = invoiceMap.get(invoiceNumber);
         invoiceData.items.push({
           itemName: sale.itemId?.itemName || '-',
@@ -557,39 +823,22 @@ exports.downloadSalesReport = async (req, res) => {
         });
         invoiceData.totalAmount += amount;
       });
-      let reportHeaders = [
-        'invoiceNumber',
-        'saleDate',
-        'customerName',
-        'createdBy',
-        'quantity',
-        'itemName',
-        'pricePerUnit',
-        'totalAmount',
-      ];
+
       const uniqueInvoices = Array.from(invoiceMap.values());
       const fileName = `sales-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
+
       if (format === 'pdf') {
-        await createSalesReportPDF(
-          uniqueInvoices,
-          reportHeaders,
-          outputPath,
-          type
-        );
+        await createSalesReportPDF(uniqueInvoices, headers, outputPath, type);
       } else if (format === 'csv') {
-        await createSalesReportCSV(
-          uniqueInvoices,
-          reportHeaders,
-          outputPath,
-          type
-        );
+        await createSalesReportCSV(uniqueInvoices, headers, outputPath, type);
       } else {
         return badRequestErrorResponse(
           res,
           'Invalid format. Use "pdf" or "csv".'
         );
       }
+
       const s3Url = await misData(outputPath);
       fs.unlinkSync(outputPath);
       return successResponse(
@@ -597,7 +846,7 @@ exports.downloadSalesReport = async (req, res) => {
         'Sales report downloaded successfully',
         s3Url
       );
-    } else if (type == 'Inventory') {
+    } else if (type === 'Inventory') {
       const query = {};
       if (startDate && endDate) {
         query.saleDate = {
@@ -608,50 +857,67 @@ exports.downloadSalesReport = async (req, res) => {
       let inventory = await Inventory.find(query).sort({
         createdAt: -1,
       });
+
       inventory = await Promise.all(
         inventory.map(async (item) => {
-          const sales = await Sale.find({ itemId: item._id });
-          let quantity = 0;
-          let stockValue = 0;
+          const sales = await Sale.find({ itemId: item._id }).sort({
+            createdAt: 1,
+          }); // Sort by creation date
+          let currentQuantity = 0;
+          let currentStockValue = 0;
+
           sales.forEach((sale) => {
+            const quantitySet = parseInt(sale.quantity, 10) || 0;
             const pricePerUnit = parseFloat(sale.pricePerUnit);
-            if (sale.orderType === 'Opening' || sale.orderType === 'Add') {
-              quantity += parseInt(sale.quantity, 10);
-              stockValue += quantity * pricePerUnit;
-            } else if (
-              sale.orderType === 'Reduce'
-            ) {
-              quantity -= parseInt(sale.quantity, 10);
-              stockValue -= quantity * pricePerUnit;
+
+            switch (sale.orderType) {
+              case 'Opening':
+              case 'Add':
+                currentQuantity += quantitySet;
+                currentStockValue += quantitySet * pricePerUnit;
+                break;
+              case 'Reduce':
+                currentQuantity -= quantitySet;
+                currentStockValue -= quantitySet * pricePerUnit;
+                break;
+              case 'Sales':
+                if (currentQuantity <= 0) break;
+                const avgCost = currentStockValue / currentQuantity;
+                const costOfGoodsSold = quantitySet * avgCost;
+                currentQuantity -= quantitySet;
+                currentStockValue -= costOfGoodsSold;
+                break;
+              default:
+                break;
             }
-            if(sale.orderType === 'Sales'){
-              quantity -= parseInt(sale.quantity, 10);
-              stockValue -= quantity * pricePerUnit;
-            }
+            currentQuantity = currentQuantity;
+            currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
           });
           return {
-            saleDate: item.createdAt,
-            itemId: item.itemName,
-            quantity: quantity,
+            itemName: item.itemName,
             salesPrice: item.salePrice || 0,
             purchasePrice: item.purchasePrice || 0,
-            'stock value': stockValue.toFixed(2),
+            quantity: currentQuantity,
+            'stock value': parseFloat(currentStockValue.toFixed(2)),
+            createdAt: item.createdAt,
           };
         })
       );
-      const reportHeaders = headers.length > 0 ? headers : DEFAULT_HEADERS;
+
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
+
       if (format === 'pdf') {
-        await createSalesReportPDF(inventory, reportHeaders, outputPath, type);
+        await createSalesReportPDF(inventory, headers, outputPath, type);
       } else if (format === 'csv') {
-        await createSalesReportCSV(inventory, reportHeaders, outputPath, type);
+        await createSalesReportCSV(inventory, headers, outputPath, type);
       } else {
         return badRequestErrorResponse(
           res,
           'Invalid format. Use "pdf" or "csv".'
         );
       }
+
       const s3Url = await misData(outputPath);
       fs.unlinkSync(outputPath);
       return successResponse(
@@ -665,92 +931,198 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
-const DEFAULT_HEADERS = [
-  'Serial Number',
-  'itemId',
-  'salesPrice',
-  'purchasePrice',
-  'quantity',
-  'stock value',
-];
-
-
 async function createSalesReportPDF(data, headers, outputPath, type) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
+    // Title
     doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
 
-    const columnWidth = 520 / headers.length;
+    // Ensure standard headers are used
+    const effectiveHeaders = getEffectiveHeaders(headers, type);
+
+    // Calculate column widths
+    const columnCount = effectiveHeaders.length;
+    const tableWidth = 520;
+    const columnWidth = tableWidth / columnCount;
     const rowHeight = 20;
-    let y = doc.y;
-    headers.forEach((header, i) => {
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10)
-        .text(header, 30 + i * columnWidth, y, {
-          width: columnWidth,
-          align: 'left',
-        });
+    const tableTop = doc.y;
+
+    // Draw header row
+    doc.font('Helvetica-Bold').fontSize(10);
+    effectiveHeaders.forEach((header, i) => {
+      doc.text(header, 30 + i * columnWidth, tableTop, {
+        width: columnWidth,
+        align: 'left',
+      });
     });
 
-    y += rowHeight;
+    // Draw header underline
+    doc
+      .moveTo(30, tableTop + rowHeight)
+      .lineTo(30 + tableWidth, tableTop + rowHeight)
+      .lineWidth(1)
+      .stroke();
+
+    // Draw data rows
+    let y = tableTop + rowHeight;
     data.forEach((entry, index) => {
-      headers.forEach((header, i) => {
+      // Draw left border
+      doc
+        .moveTo(30, y)
+        .lineTo(30, y + rowHeight)
+        .stroke();
+
+      effectiveHeaders.forEach((header, i) => {
+        const x = 30 + i * columnWidth;
+        const value = getValueByHeader(entry, header, index);
+
+        // Draw cell content
+        doc.font('Helvetica').fontSize(10);
+        doc.text(value.toString(), x + 5, y + 5, {
+          width: columnWidth - 10,
+          align: 'left',
+        });
+
+        // Draw right border
         doc
-          .font('Helvetica')
-          .fontSize(10)
-          .text(getValueByHeader(entry, header, index), 30 + i * columnWidth, y, {
-            width: columnWidth,
-            align: 'left',
-          });
+          .moveTo(x + columnWidth, y)
+          .lineTo(x + columnWidth, y + rowHeight)
+          .stroke();
       });
+
+      // Draw bottom border
+      doc
+        .moveTo(30, y + rowHeight)
+        .lineTo(30 + tableWidth, y + rowHeight)
+        .stroke();
+
       y += rowHeight;
+
+      // Handle page break
       if (y > doc.page.height - 50) {
         doc.addPage();
         y = 50;
+        // Redraw header on new page
+        doc.font('Helvetica-Bold').fontSize(10);
+        effectiveHeaders.forEach((header, i) => {
+          doc.text(header, 30 + i * columnWidth, y - rowHeight, {
+            width: columnWidth,
+            align: 'left',
+          });
+        });
       }
     });
-    
 
     doc.end();
     stream.on('finish', () => resolve(outputPath));
     stream.on('error', reject);
   });
 }
+
+function getEffectiveHeaders(headers, type) {
+  const defaultHeaders = {
+    Sale: [
+      'Serial Number',
+      'Item Name',
+      'Invoice Number',
+      'Sale Date',
+      'Customer Name',
+      'Quantity',
+      'Price Per Unit',
+      'Total Amount',
+    ],
+    Inventory: [
+      'Serial Number',
+      'Item Name',
+      'Sales Price',
+      'Purchase Price',
+      'Stock Quantity',
+      'Stock Value',
+    ],
+  };
+
+  // If no headers provided, use defaults
+  if (!headers || headers.length === 0) {
+    return defaultHeaders[type];
+  }
+
+  // Ensure "Item Name" is included
+  if (
+    !headers.includes('Item Name') &&
+    !headers.some((h) => h.toLowerCase().includes('item'))
+  ) {
+    headers.unshift('Item Name');
+  }
+
+  return headers;
+}
+
 function getValueByHeader(entry, header, index = 0) {
   switch (header) {
     case 'Serial Number':
       return index + 1;
-    case 'saleDate':
-      return entry.saleDate
-        ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
-        : '-';
-    case 'itemId':
-      return entry.itemId || '-';
-    case 'quantity':
-      return entry.quantity || 0;
-    case 'pricePerUnit':
-      return entry.pricePerUnit || 0;
-    case 'stock value':
-      return entry['stock value'] || '0.00';
-    case 'salesPrice':
-      return entry.salesPrice || '-';
-    case 'purchasePrice':
-      return entry.purchasePrice || '-';
-    case 'invoiceNumber':
+    case 'Item Name':
+      return entry.itemName || entry.itemId?.itemName || entry.itemId || '-';
+    case 'Invoice Number':
       return entry.invoiceNumber || '-';
-    case 'customerName':
+    case 'Sale Date':
+      return entry.saleDate
+        ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY')
+        : '-';
+    case 'Customer Name':
       return entry.customerName || '-';
-    case 'createdBy':
+    case 'Quantity':
+    case 'Stock Quantity':
+      return entry.quantity || '0';
+    case 'Price Per Unit':
+      return entry.pricePerUnit
+        ? parseFloat(entry.pricePerUnit).toFixed(2)
+        : '0.00';
+    case 'Total Amount':
+      return entry.totalAmount
+        ? parseFloat(entry.totalAmount).toFixed(2)
+        : '0.00';
+    case 'Sales Price':
+      return entry.salesPrice
+        ? parseFloat(entry.salesPrice).toFixed(2)
+        : '0.00';
+    case 'Purchase Price':
+      return entry.purchasePrice
+        ? parseFloat(entry.purchasePrice).toFixed(2)
+        : '0.00';
+    case 'Stock Value':
+      return entry['stock value'] || '0.00';
+    case 'Created By':
       return entry.createdBy || '-';
-    case 'itemName':
-      return entry.itemName || '-';
-    case 'totalAmount':
-      return entry.totalAmount?.toFixed(2) || '0.00';
     default:
-      return '-';
+      return entry[header] || '-';
   }
+}
+
+async function createSalesReportCSV(data, headers, outputPath, type) {
+  return new Promise((resolve, reject) => {
+    const effectiveHeaders = getEffectiveHeaders(headers, type);
+    const csvRows = [];
+
+    // Add header row
+    csvRows.push(effectiveHeaders.join(','));
+
+    // Add data rows
+    data.forEach((entry, index) => {
+      const row = effectiveHeaders.map((header) => {
+        const value = getValueByHeader(entry, header, index);
+        // Escape commas and quotes in CSV
+        return `"${value.toString().replace(/"/g, '""')}"`;
+      });
+      csvRows.push(row.join(','));
+    });
+
+    fs.writeFile(outputPath, csvRows.join('\n'), 'utf8', (err) => {
+      if (err) reject(err);
+      else resolve(outputPath);
+    });
+  });
 }

@@ -68,10 +68,9 @@ exports.getAllInventory = async (req, res, next) => {
     const inventory = await pagination(Inventory, query, page, limit);
     inventory.result = await Promise.all(
       inventory.result.map(async (item) => {
-        const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 }); // Sort by creation date
+        const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 });
         let currentQuantity = 0;
         let currentStockValue = 0;
-        
         sales.forEach((sale) => {
           const quantitySet = parseInt(sale.quantity, 10) || 0;
           const pricePerUnit = parseFloat(sale.pricePerUnit);
