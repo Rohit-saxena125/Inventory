@@ -17,7 +17,7 @@ const { console } = require('inspector');
 
 exports.fetchSales = async (req, res) => {
   try {
-    const { page, limit, search, itemId, startDate, endDate, userId } =
+    const { page, limit, search, itemId, startDate, endDate, userId,invoiceNumber } =
       req.query;
     const query = { isDeleted: false };
     if (itemId) {
@@ -39,6 +39,9 @@ exports.fetchSales = async (req, res) => {
         $regex: search,
         $options: 'i',
       };
+    }
+    if (invoiceNumber) {
+      query.invoiceNumber = invoiceNumber;
     }
     const populate = [{ path: 'itemId', select: 'itemName' }];
     const sales = await pagination(
@@ -199,6 +202,70 @@ exports.fetchDummySales = async (req, res) => {
       sales,
       totalBill,
     });
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+};
+
+exports.fetchDummySalesById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sales = await SaleDummy.findOne({ _id: id }).populate('itemId');
+    if (!sales) {
+      return badRequestErrorResponse(res, 'Sales not found');
+    }
+    return successResponse(res, 'Sales fetched successfully', sales);
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+};
+
+exports.updateSalesDummy = async (req, res) => {
+  try {
+    const {
+      quantity,
+      pricePerUnit,
+      description,
+      saleDate,
+      itemId,
+      customerName,
+      discount,
+      totalAmount,
+      invoiceNumber,
+    } = req.body;
+    const { id } = req.params;
+    let sales = await SaleDummy.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          orderType: 'Sales',
+          quantity,
+          pricePerUnit,
+          description,
+          saleDate: (() => {
+            const datePart = moment.tz(saleDate, 'Asia/Kolkata');
+            const currentTime = moment.tz('Asia/Kolkata');
+            datePart.set({
+              hour: currentTime.hour(),
+              minute: currentTime.minute(),
+              second: currentTime.second(),
+            });
+            return datePart.toDate();
+          })(),
+          itemId,
+          customerName,
+          discount,
+          totalAmount,
+          invoiceNumber,
+          createdBy: req.user._id,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    if (!sales) {
+      return badRequestErrorResponse(res, 'Sales not found');
+    }
+    return successResponse(res, 'Sales updated successfully', sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
@@ -933,7 +1000,10 @@ exports.downloadSalesReport = async (req, res) => {
         'Inventory report downloaded successfully not',
         s3Url
       );
-      return successResponse(res, 'Inventory report downloaded successfully not');
+      return successResponse(
+        res,
+        'Inventory report downloaded successfully not'
+      );
     }
   } catch (error) {
     return internalServerErrorResponse(res, error);
