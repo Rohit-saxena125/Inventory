@@ -13,7 +13,6 @@ const { misData } = require('../../middlewares/upload/upload');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
-const { console } = require('inspector');
 
 exports.fetchSales = async (req, res) => {
   try {
@@ -523,7 +522,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .font('Courier-Bold')
       .text('', { align: 'center' })
       .fontSize(9)
-      .text('-------------------------------');
+      .text('------------------------------------');
 
     // Customer + Invoice Info
     doc
@@ -531,7 +530,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .text(`Customer   : ${firstSale.customerName}`)
       .text(`Invoice No : ${firstSale.invoiceNumber}`)
       .text(`Date       : ${formattedDate}`)
-      .text('-------------------------------');
+      .text('-------------------------------------');
 
     let totalDiscount = 0;
     let totalAmount = 0;
@@ -539,7 +538,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     // Table Heading
     doc
       .font('Courier-Bold')
-      .text('Item         Qty   Rate           Amt')
+      .text('Item             Qty             Rate             Amt')
       .font('Courier');
 
     // Items Loop
@@ -560,11 +559,11 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     doc
       .font('Courier')
-      .text('-------------------------------')
+      .text('----------------------------------------')
       .font('Courier-Bold')
       .text(`Discount   : Rs.${totalDiscount.toFixed(2)}`)
       .text(`Total      : Rs.${totalAmount.toFixed(2)}`)
-      .text('===============================')
+      .text('=========================================')
       .fontSize(10)
       .text('Thank you for your purchase!', { align: 'center' })
       .text('Visit Again', { align: 'center' });
