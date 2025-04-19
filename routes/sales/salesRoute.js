@@ -16,4 +16,5 @@ router.post('/createFinalSales', tokenVerify, checkRole(['Admin','Cashier']), sa
 router.get('/fetchSalesReport', tokenVerify, checkRole(['Admin']), salesController.fetchSalesReport);
 router.get('/fetchSaleDummy/:id', tokenVerify, checkRole(['Admin','Cashier']), salesController.fetchDummySalesById);
 router.patch('/updateSaleDummy/:id', tokenVerify, checkRole(['Admin','Cashier']), salesController.updateSalesDummy);
+router.delete('/deleteSaleDummy/:id', tokenVerify, checkRole(['Admin','Cashier']), salesController.deleteSalesDummy);
 module.exports = router;

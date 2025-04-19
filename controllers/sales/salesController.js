@@ -270,6 +270,20 @@ exports.updateSalesDummy = async (req, res) => {
   }
 };
 
+exports.deleteSalesDummy = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sales = await SaleDummy.findOne({ _id: id });
+    if (!sales) {
+      return badRequestErrorResponse(res, 'Sales not found');
+    }
+    await SaleDummy.findByIdAndDelete(id);
+    return successResponse(res, 'Sales deleted successfully');
+  } catch (error) {
+    return internalServerErrorResponse(res, error);
+  }
+}
+
 exports.updateSales = async (req, res) => {
   try {
     const { id } = req.params;
