@@ -66,7 +66,7 @@ exports.getAllInventory = async (req, res, next) => {
         $options: 'i',
       };
     }
-    const inventory = await pagination(Inventory, query, page, limit);
+    let inventory = await pagination(Inventory, query, page, limit);
     inventory.result = await Promise.all(
       inventory.result.map(async (item) => {
         const openingStock = await Sale.findOne({ orderType: 'Opening', itemId: item._id }).sort({ createdAt: 1 });
