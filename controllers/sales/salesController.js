@@ -141,7 +141,6 @@ exports.createFinalSales = async (req, res) => {
     const invoiceNumber = req.query.invoiceNumber;
 
     await updateInvoiceNumber(invoiceNumber);
-
     const sales = [];
     for (const item of listSales) {
       const dummySales = await SaleDummy.findOne({ _id: item });

@@ -409,8 +409,8 @@ exports.addReduceInventory = async (req, res, next) => {
       orderType: type,
       itemId: itemId,
       quantity: quantity,
-      pricePerUnit: pricePerUnit,
-      description: description,
+      pricePerUnit: pricePerUnit?pricePerUnit: 0,
+      description: description?description: null,
       saleDate: saleDate,
     });
     return successResponse(res, `Inventory ${type} successfully`);
