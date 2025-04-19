@@ -857,7 +857,7 @@ exports.downloadSalesReport = async (req, res) => {
           sales.forEach((sale) => {
             const quantitySet = parseInt(sale.quantity, 10) || 0;
             const pricePerUnit = parseFloat(sale.pricePerUnit);
-
+            console.log('Sale:', sale);
             switch (sale.orderType) {
               case 'Opening':
               case 'Add':
