@@ -240,7 +240,6 @@ exports.reportInventory = async (req, res, next) => {
     }
     if (type == 'Inventory') {
       const allInventoryItems = await Inventory.find(query);
-     
       const inventoryCalculations = await Promise.all(
         allInventoryItems.map(async (item) => {
           let openingStock = await Sale.findOne({ orderType: 'Opening' ,itemId: item._id }).sort({ createdAt: 1 });
@@ -279,6 +278,7 @@ exports.reportInventory = async (req, res, next) => {
           };
         })
       );
+      console.log(inventoryCalculations);
       const noOFItems = inventoryCalculations.length;
       const totalStockValue = inventoryCalculations.reduce(
         (sum, calc) => sum + calc.stockValue,
