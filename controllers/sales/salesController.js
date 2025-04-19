@@ -756,17 +756,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 //       return '-';
 //   }
 // }
-const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const path = require('path');
-const moment = require('moment-timezone');
-const { Sale, Inventory } = require('../models'); // Adjust path as needed
-const { misData } = require('../services/aws'); // Adjust path as needed
-const {
-  successResponse,
-  badRequestErrorResponse,
-  internalServerErrorResponse,
-} = require('../utils/response'); // Adjust path as needed
 
 exports.downloadSalesReport = async (req, res) => {
   try {
