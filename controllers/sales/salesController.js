@@ -769,7 +769,6 @@ exports.downloadSalesReport = async (req, res) => {
       search,
       type = 'Sale',
     } = req.body;
-    console.log('Type:', type);
     if (type === 'Sale') {
       const query = { isDeleted: false, orderType: 'Sales' };
       if (userId) {
@@ -837,30 +836,35 @@ exports.downloadSalesReport = async (req, res) => {
         s3Url
       );
     } else if (type === 'Inventory') {
+      const { qty, outOfStock, inActive } = req.query;
       const query = {};
       if (startDate && endDate) {
-        query.saleDate = {
+        query.createdAt = {
           $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
           $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
         };
       }
-      console.log('Query:', query);
       let inventory = await Inventory.find(query).sort({
         createdAt: -1,
       });
       inventory = await Promise.all(
         inventory.map(async (item) => {
-          console.log('Item:', item);
+          let openingStock = await Sale.findOne({
+            orderType: 'Opening',
+            itemId: item._id,
+          }).sort({ createdAt: 1 });
           const sales = await Sale.find({ itemId: item._id }).sort({
             createdAt: 1,
-          }); // Sort by creation date
+          });
           let currentQuantity = 0;
           let currentStockValue = 0;
-
+          let lastSaleDate = null;
           sales.forEach((sale) => {
             const quantitySet = parseInt(sale.quantity, 10) || 0;
             const pricePerUnit = parseFloat(sale.pricePerUnit);
-            console.log('Sale:', sale);
+            if (sale.orderType === 'Sales' && lastSaleDate === null) {
+              lastSaleDate = sale.createdAt;
+            }
             switch (sale.orderType) {
               case 'Opening':
               case 'Add':
@@ -884,15 +888,6 @@ exports.downloadSalesReport = async (req, res) => {
             currentQuantity = currentQuantity;
             currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
           });
-          console.log('Current Quantity:', currentQuantity);
-          console.log('Current Stock Value:', {
-            itemName: item.itemName,
-            salesPrice: item.salePrice || 0,
-            purchasePrice: item.purchasePrice || 0,
-            quantity: currentQuantity,
-            'stock value': parseFloat(currentStockValue.toFixed(2)),
-            createdAt: item.createdAt,
-          });
           return {
             itemName: item.itemName,
             salesPrice: item.salePrice || 0,
@@ -900,10 +895,24 @@ exports.downloadSalesReport = async (req, res) => {
             quantity: currentQuantity,
             'stock value': parseFloat(currentStockValue.toFixed(2)),
             createdAt: item.createdAt,
+            isOutOfStock: currentQuantity <= 0,
+            isBelowMinQty:
+              currentQuantity <= parseInt(openingStock.minQty) ? true : false,
+            isInactive: lastSaleDate
+              ? moment().diff(moment(lastSaleDate), 'days') > 60
+              : false,
           };
         })
       );
-      console.log('Inventory:', inventory);
+      if (qty) {
+        inventory = inventory.filter((item) => item.isBelowMinQty);
+      }
+      if (outOfStock) {
+        inventory = inventory.filter((item) => item.isOutOfStock);
+      }
+      if (inActive) {
+        inventory = inventory.filter((item) => item.isInactive);
+      }
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
 
@@ -918,13 +927,14 @@ exports.downloadSalesReport = async (req, res) => {
         );
       }
 
-      const s3Url = await misData(outputPath);
-      fs.unlinkSync(outputPath);
-      return successResponse(
-        res,
-        'Inventory report downloaded successfully not',
-        s3Url
-      );
+      // const s3Url = await misData(outputPath);
+      // fs.unlinkSync(outputPath);
+      // return successResponse(
+      //   res,
+      //   'Inventory report downloaded successfully not',
+      //   s3Url
+      // );
+      return successResponse(res, 'Inventory report downloaded successfully not');
     }
   } catch (error) {
     return internalServerErrorResponse(res, error);
