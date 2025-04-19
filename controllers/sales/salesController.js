@@ -262,6 +262,9 @@ exports.deleteSales = async (req, res) => {
         { $set: { isDeleted: true } },
         { new: true, runValidators: true }
       );
+      await InvoiceCounter.deleteOne({
+        invoiceNumber: sales.invoiceNumber,
+      });
     }
     return successResponse(res, 'Sales deleted successfully');
   } catch (error) {
@@ -313,12 +316,20 @@ exports.deleteSalesAll = async (req, res) => {
     }
     if (invoiceNumber) {
       query.invoiceNumber = invoiceNumber;
+      
     }
+    const sales = await Sale.find(query);
+    const invoiceNumbers = [...new Set(sales.map(sale => sale.invoiceNumber))];
     await Sale.updateMany(
       query,
       { $set: { isDeleted: true } },
       { new: true, runValidators: true }
     );
+    if (invoiceNumbers.length > 0) {
+      await InvoiceCounter.deleteMany({
+        invoiceNumber: { $in: invoiceNumbers },
+      });
+    }
     return successResponse(res, 'All Sales deleted successfully ');
   } catch (error) {
     return internalServerErrorResponse(res, error);
@@ -675,8 +686,6 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     const columnWidth = 520 / headers.length;
     const rowHeight = 20;
     let y = doc.y;
-
-    // Draw headers
     headers.forEach((header, i) => {
       doc
         .font('Helvetica-Bold')
@@ -688,8 +697,6 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     });
 
     y += rowHeight;
-
-    // Draw data rows
     data.forEach((entry, index) => {
       headers.forEach((header, i) => {
         doc
@@ -701,8 +708,6 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
           });
       });
       y += rowHeight;
-    
-      // Handle page overflow
       if (y > doc.page.height - 50) {
         doc.addPage();
         y = 50;
@@ -718,7 +723,7 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
 function getValueByHeader(entry, header, index = 0) {
   switch (header) {
     case 'Serial Number':
-      return index + 1; // 1-based serial number
+      return index + 1;
     case 'saleDate':
       return entry.saleDate
         ? moment(entry.saleDate).tz('Asia/Kolkata').format('DD-MM-YYYY hh:mm A')
