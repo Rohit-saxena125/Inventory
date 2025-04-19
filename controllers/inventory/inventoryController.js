@@ -115,7 +115,7 @@ exports.getAllInventory = async (req, res, next) => {
       })
     );
     if (qty =='true') {
-      inventory.result = inventory.result.filter(item => isBelowMinQty);
+      inventory.result = inventory.result.filter(item => item.isBelowMinQty);
     }
     if (outOfStock == 'true') {
       inventory.result = inventory.result.filter(item => item.isOutOfStock);
