@@ -115,13 +115,15 @@ exports.getAllInventory = async (req, res, next) => {
       })
     );
     console.log(inventory);
-    if (qty =='true') {
+    if (qty === 'true') {
       inventory.result = inventory.result.filter(item => item.isBelowMinQty);
+      console.log(inventory.result);
     }
-    if (outOfStock == 'true') {
+    if (outOfStock === 'true') {
       inventory.result = inventory.result.filter(item => item.isOutOfStock);
+      console.log(inventory.result);
     }
-    if (inActive == 'true') {
+    if (inActive === 'true') {
       inventory.result = inventory.result.filter(item => item.isInactive);
     }
     return successResponse(res, 'Inventory fetched successfully', inventory);
