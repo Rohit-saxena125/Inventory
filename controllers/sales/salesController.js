@@ -922,7 +922,7 @@ exports.downloadSalesReport = async (req, res) => {
       fs.unlinkSync(outputPath);
       return successResponse(
         res,
-        'Inventory report downloaded successfully',
+        'Inventory report downloaded successfully not',
         s3Url
       );
     }
