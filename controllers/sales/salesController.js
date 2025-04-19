@@ -159,7 +159,7 @@ exports.createFinalSales = async (req, res) => {
         createdBy: req.user._id,
       });
 
-      await SaleDummy.findByIdAndDelete(item._id);
+      await SaleDummy.findByIdAndDelete(dummySales._id);
       sales.push(sale._id);
     }
 
