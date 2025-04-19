@@ -926,14 +926,13 @@ exports.downloadSalesReport = async (req, res) => {
           'Invalid format. Use "pdf" or "csv".'
         );
       }
-
-      // const s3Url = await misData(outputPath);
-      // fs.unlinkSync(outputPath);
-      // return successResponse(
-      //   res,
-      //   'Inventory report downloaded successfully not',
-      //   s3Url
-      // );
+      const s3Url = await misData(outputPath);
+      fs.unlinkSync(outputPath);
+      return successResponse(
+        res,
+        'Inventory report downloaded successfully not',
+        s3Url
+      );
       return successResponse(res, 'Inventory report downloaded successfully not');
     }
   } catch (error) {
