@@ -769,7 +769,7 @@ exports.downloadSalesReport = async (req, res) => {
       search,
       type = 'Sale',
     } = req.body;
-console.log('Type:', type);
+    console.log('Type:', type);
     if (type === 'Sale') {
       const query = { isDeleted: false, orderType: 'Sales' };
       if (userId) {
@@ -844,6 +844,7 @@ console.log('Type:', type);
           $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
         };
       }
+      console.log('Query:', query);
       let inventory = await Inventory.find(query).sort({
         createdAt: -1,
       });
