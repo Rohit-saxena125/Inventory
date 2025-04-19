@@ -45,9 +45,10 @@ exports.createInventory = async (req, res, next) => {
     return internalServerErrorResponse(res, error.message);
   }
 };
+
 exports.getAllInventory = async (req, res, next) => {
   try {
-    const { page, limit, search, startDate, endDate, qty } = req.query;
+    const { page, limit, search, startDate, endDate, qty, outOfStock, inActive } = req.query;
     const query = {};
     if (startDate && endDate) {
       query.createdAt = {
@@ -68,14 +69,18 @@ exports.getAllInventory = async (req, res, next) => {
     const inventory = await pagination(Inventory, query, page, limit);
     inventory.result = await Promise.all(
       inventory.result.map(async (item) => {
+        const openingStock = await Sale.findOne({ orderType: 'Opening', itemId: item._id }).sort({ createdAt: 1 });
         const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 });
         let currentQuantity = 0;
         let currentStockValue = 0;
+        let lastSaleDate = null;
         sales.forEach((sale) => {
           const quantitySet = parseInt(sale.quantity, 10) || 0;
           const pricePerUnit = parseFloat(sale.pricePerUnit);
-          
-          switch(sale.orderType) {
+          if (sale.orderType === 'Sales' && lastSaleDate === null) {
+            lastSaleDate = sale.createdAt;
+          }
+          switch (sale.orderType) {
             case 'Opening':
             case 'Add':
               currentQuantity += quantitySet;
@@ -98,16 +103,25 @@ exports.getAllInventory = async (req, res, next) => {
           currentQuantity = currentQuantity;
           currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
         });
-        
+
         return {
           ...item.toObject(),
           quantity: currentQuantity,
           stockValue: parseFloat(currentStockValue.toFixed(2)),
+          isOutOfStock: currentQuantity <= 0,
+          isBelowMinQty: item.minQty ? currentQuantity < item.minQty : false,
+          isInactive: lastSaleDate ? moment().diff(moment(lastSaleDate), 'days') > 60 : false
         };
       })
     );
     if (qty) {
-      inventory.result = inventory.result.filter((item) => item.quantity <= 0);
+      inventory.result = inventory.result.filter(item => item.quantity <= 0);
+    }
+    if (outOfStock) {
+      inventory.result = inventory.result.filter(item => item.isOutOfStock);
+    }
+    if (inActive) {
+      inventory.result = inventory.result.filter(item => item.isInactive);
     }
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
@@ -127,7 +141,7 @@ exports.getInventoryById = async (req, res, next) => {
     sales.forEach((sale) => {
       const quantity = parseInt(sale.quantity, 10) || 0;
       const pricePerUnit = parseFloat(sale.pricePerUnit);
-      switch(sale.orderType) {
+      switch (sale.orderType) {
         case 'Opening':
         case 'Add':
           currentQuantity += quantity;
@@ -135,7 +149,7 @@ exports.getInventoryById = async (req, res, next) => {
           break;
         case 'Reduce':
           currentQuantity -= quantity;
-          currentStockValue -= quantity * pricePerUnit; 
+          currentStockValue -= quantity * pricePerUnit;
           break;
         case 'Sales':
           if (currentQuantity <= 0) break;
@@ -154,7 +168,7 @@ exports.getInventoryById = async (req, res, next) => {
     inventory = inventory.toObject();
     inventory.openingStock = openingStock;
     inventory.stockValue = parseFloat(currentStockValue.toFixed(2))
-    inventory.quantity =  currentQuantity;
+    inventory.quantity = currentQuantity;
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
     return internalServerErrorResponse(res, error);
@@ -241,14 +255,14 @@ exports.reportInventory = async (req, res, next) => {
       const allInventoryItems = await Inventory.find(query);
       const inventoryCalculations = await Promise.all(
         allInventoryItems.map(async (item) => {
-          let openingStock = await Sale.findOne({ orderType: 'Opening' ,itemId: item._id }).sort({ createdAt: 1 });
+          let openingStock = await Sale.findOne({ orderType: 'Opening', itemId: item._id }).sort({ createdAt: 1 });
           const sales = await Sale.find({ itemId: item._id }).sort({ createdAt: 1 });
           let currentQuantity = 0;
           let currentStockValue = 0;
           sales.forEach((sale) => {
             const quantity = parseInt(sale.quantity, 10) || 0;
             const pricePerUnit = parseFloat(sale.pricePerUnit);
-            switch(sale.orderType) {
+            switch (sale.orderType) {
               case 'Opening':
               case 'Add':
                 currentQuantity += quantity;
@@ -293,7 +307,7 @@ exports.reportInventory = async (req, res, next) => {
     } else {
       query.isDeleted = false;
       query.orderType = 'Sales';
-      if(userId) {
+      if (userId) {
         query.createdBy = userId;
       }
       const sales = await Sale.find(query);
