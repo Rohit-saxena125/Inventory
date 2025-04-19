@@ -892,7 +892,7 @@ exports.downloadSalesReport = async (req, res) => {
           };
         })
       );
-
+      console.log('Inventory:', inventory);
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
 
