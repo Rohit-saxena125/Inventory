@@ -109,18 +109,18 @@ exports.getAllInventory = async (req, res, next) => {
           quantity: currentQuantity,
           stockValue: parseFloat(currentStockValue.toFixed(2)),
           isOutOfStock: currentQuantity <= 0,
-          isBelowMinQty: item.minQty ? currentQuantity < item.minQty : false,
+          isBelowMinQty: currentQuantity <= openingStock.minQty ?true : false,
           isInactive: lastSaleDate ? moment().diff(moment(lastSaleDate), 'days') > 60 : false
         };
       })
     );
-    if (qty) {
+    if (qty === 'true') {
       inventory.result = inventory.result.filter(item => item.quantity <= 0);
     }
-    if (outOfStock) {
+    if (outOfStock === 'true') {
       inventory.result = inventory.result.filter(item => item.isOutOfStock);
     }
-    if (inActive) {
+    if (inActive === 'true') {
       inventory.result = inventory.result.filter(item => item.isInactive);
     }
     return successResponse(res, 'Inventory fetched successfully', inventory);
