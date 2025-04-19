@@ -114,13 +114,13 @@ exports.getAllInventory = async (req, res, next) => {
         };
       })
     );
-    if (qty === 'true') {
-      inventory.result = inventory.result.filter(item => item.quantity <= 0);
+    if (qty =='true') {
+      inventory.result = inventory.result.filter(item => isBelowMinQty);
     }
-    if (outOfStock === 'true') {
+    if (outOfStock == 'true') {
       inventory.result = inventory.result.filter(item => item.isOutOfStock);
     }
-    if (inActive === 'true') {
+    if (inActive == 'true') {
       inventory.result = inventory.result.filter(item => item.isInactive);
     }
     return successResponse(res, 'Inventory fetched successfully', inventory);
