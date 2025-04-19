@@ -846,7 +846,6 @@ exports.downloadSalesReport = async (req, res) => {
       let inventory = await Inventory.find(query).sort({
         createdAt: -1,
       });
-
       inventory = await Promise.all(
         inventory.map(async (item) => {
           const sales = await Sale.find({ itemId: item._id }).sort({
@@ -881,6 +880,15 @@ exports.downloadSalesReport = async (req, res) => {
             }
             currentQuantity = currentQuantity;
             currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
+          });
+          console.log('Current Quantity:', currentQuantity);
+          console.log('Current Stock Value:', {
+            itemName: item.itemName,
+            salesPrice: item.salePrice || 0,
+            purchasePrice: item.purchasePrice || 0,
+            quantity: currentQuantity,
+            'stock value': parseFloat(currentStockValue.toFixed(2)),
+            createdAt: item.createdAt,
           });
           return {
             itemName: item.itemName,
