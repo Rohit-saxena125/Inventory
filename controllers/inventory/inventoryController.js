@@ -62,11 +62,11 @@ exports.getAllInventory = async (req, res, next) => {
     if (startDate && endDate) {
       query.createdAt = {
         $gte: moment
-          .tz(startDate, 'Asia/Kolkata')
+          .tz(startDate,'DD-MM-YYYY', 'Asia/Kolkata')
           .startOf('day')
           .utc()
           .toDate(),
-        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
+        $lte: moment.tz(endDate,'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').utc().toDate(),
       };
     }
     if (search) {
@@ -259,17 +259,17 @@ exports.reportInventory = async (req, res, next) => {
       outOfStock,
       inActive, } = req.query;
     let query = {};
-    if (startDate && endDate) {
-      query.createdAt = {
-        $gte: moment
-          .tz(startDate, 'Asia/Kolkata')
-          .startOf('day')
-          .utc()
-          .toDate(),
-        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
-      };
-    }
     if (type == 'Inventory') {
+      if (startDate && endDate) {
+        query.createdAt = {
+          $gte: moment
+            .tz(startDate,'DD-MM-YYYY', 'Asia/Kolkata')
+            .startOf('day')
+            .utc()
+            .toDate(),
+          $lte: moment.tz(endDate, 'DD-MM-YYYY','Asia/Kolkata').endOf('day').utc().toDate(),
+        };
+      }
       const allInventoryItems = await Inventory.find(query);
       let inventoryCalculations = await Promise.all(
         allInventoryItems.map(async (item) => {
@@ -347,6 +347,16 @@ exports.reportInventory = async (req, res, next) => {
       });
     } else {
       query.isDeleted = false;
+      if (startDate && endDate) {
+        query.saleDate = {
+          $gte: moment
+            .tz(startDate,'DD-MM-YYYY', 'Asia/Kolkata')
+            .startOf('day')
+            .utc()
+            .toDate(),
+          $lte: moment.tz(endDate, 'DD-MM-YYYY','Asia/Kolkata').endOf('day').utc().toDate(),
+        };
+      }
       query.orderType = 'Sales';
       if (userId) {
         query.createdBy = userId;
