@@ -447,8 +447,8 @@ exports.fetchSalesReport = async (req, res) => {
     }
     if (startDate && endDate) {
       query.saleDate = {
-        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').toDate(),
-        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').toDate(),
+        $gte: moment.tz(startDate,'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').toDate(),
+        $lte: moment.tz(endDate,'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').toDate(),
       };
     }
     const sales = await Sale.find(query)
