@@ -746,7 +746,6 @@ exports.downloadSalesReport = async (req, res) => {
       }
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
-      headers.unshift('Serial Number');
       if (format === 'pdf') {
         await createSalesReportPDF(inventory, headers, outputPath, type);
       } else if (format === 'csv') {
@@ -891,6 +890,7 @@ function getEffectiveHeaders(headers, type) {
     !headers.some((h) => h.toLowerCase().includes('item'))
   ) {
     headers.unshift('Item Name');
+    headers.unshift('Serial Number');
   }
 
   return headers;
