@@ -551,7 +551,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     // Table Heading
     doc
       .font('Courier-Bold')
-      .text('Item             Qty             Rate             Amt')
+      .text('Item        Qty       Rate       Amt')
       .font('Courier');
 
     // Items Loop
