@@ -174,7 +174,7 @@ exports.createFinalSales = async (req, res) => {
 exports.fetchDummySales = async (req, res) => {
   try {
     const { invoiceNumber } = req.query;
-    let sales = await SaleDummy.find({ invoiceNumber: invoiceNumber })
+    let sales = await SaleDummy.find({ invoiceNumber: invoiceNumber ,createdBy: req.user._id})
       .populate('itemId')
       .populate('createdBy');
     if (!sales) {
