@@ -139,9 +139,9 @@ exports.createSales = async (req, res) => {
 exports.createFinalSales = async (req, res) => {
   try {
     const { listSales } = req.body;
-    const invoiceNumber = req.query.invoiceNumber;
+    let invoiceNumber = req.query.invoiceNumber;
 
-    await updateInvoiceNumber(invoiceNumber);
+    invoiceNumber = await updateInvoiceNumber(invoiceNumber);
     const sales = [];
     for (const item of listSales) {
       const dummySales = await SaleDummy.findOne({ _id: item });
@@ -459,17 +459,19 @@ exports.fetchSalesReport = async (req, res) => {
     const invoiceMap = new Map();
     sales.forEach((sale) => {
       const invoiceNumber = sale.invoiceNumber;
+      const saleCreatedBy = sale.createdBy?._id;
+      const key = `${invoiceNumber}-${saleCreatedBy}`;
       const price = parseFloat(sale.pricePerUnit || 0);
       const qty = parseInt(sale.quantity, 10) || 0;
       const amount = price * qty;
-      if (!invoiceMap.has(invoiceNumber)) {
-        invoiceMap.set(invoiceNumber, {
+      if (!invoiceMap.has(key)) {
+        invoiceMap.set(key, {
           invoiceNumber,
           saleDate: sale.saleDate,
           totalAmount: 0,
         });
       }
-      const invoiceData = invoiceMap.get(invoiceNumber);
+      const invoiceData = invoiceMap.get(key);
       invoiceData.totalAmount += amount;
     });
     const uniqueInvoices = Array.from(invoiceMap.values());
@@ -493,12 +495,14 @@ async function updateInvoiceNumber(invoiceNumber) {
       { $set: { invoiceNumber: invoiceNumbergen } },
       { upsert: true }
     );
+    return invoiceNumbergen;
   }
   await InvoiceCounter.findOneAndUpdate(
     {},
     { $set: { invoiceNumber: invoiceNumber } },
     { upsert: true }
   );
+  return invoiceNumber;
 }
 
 function parseAmount(val) {
@@ -620,12 +624,14 @@ exports.downloadSalesReport = async (req, res) => {
       const invoiceMap = new Map();
       sales.forEach((sale) => {
         const invoiceNumber = sale.invoiceNumber;
+        const saleCreatedBy = sale.createdBy?._id;
+      const key = `${invoiceNumber}-${saleCreatedBy}`;
         const price = parseFloat(sale.pricePerUnit || 0);
         const qty = parseInt(sale.quantity, 10) || 0;
         const amount = price * qty;
 
-        if (!invoiceMap.has(invoiceNumber)) {
-          invoiceMap.set(invoiceNumber, {
+        if (!invoiceMap.has(key)) {
+          invoiceMap.set(key, {
             invoiceNumber,
             saleDate: sale.saleDate,
             customerName: sale.customerName || '-',
@@ -635,7 +641,7 @@ exports.downloadSalesReport = async (req, res) => {
           });
         }
 
-        const invoiceData = invoiceMap.get(invoiceNumber);
+        const invoiceData = invoiceMap.get(key);
         invoiceData.items.push({
           itemName: sale.itemId?.itemName || '-',
           quantity: qty,
