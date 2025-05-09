@@ -41,7 +41,7 @@ exports.fetchSales = async (req, res) => {
     }
     if (invoiceNumber) {
       query.invoiceNumber = invoiceNumber;
-      query.createdBy = req.user._id;
+      // query.createdBy = req.user._id;
     }
     const populate = [{ path: 'itemId', select: 'itemName' }];
     const sales = await pagination(
