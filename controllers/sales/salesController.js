@@ -563,11 +563,11 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     invoiceDataArray.forEach((sale) => {
       const itemName = sale.itemId.itemName;
       const qty = sale.quantity.toString();
-      const rate = `Rs.${parseFloat(sale.pricePerUnit).toFixed(2)}`;
+      const rate = `₹ ${parseFloat(sale.pricePerUnit).toFixed(2)}`;
       const amount = parseAmount(sale.totalAmount).toFixed(2);
 
       doc.text(
-        `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs.${amount}`
+        `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} ₹ ${amount}`
       );
 
       const discount = parseAmount(sale.discount);
@@ -579,8 +579,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .font('Courier')
       .text('----------------------------------------')
       .font('Courier-Bold')
-      .text(`Discount   : Rs.${totalDiscount.toFixed(2)}`)
-      .text(`Total      : Rs.${totalAmount.toFixed(2)}`)
+      .text(`Discount   : ₹ ${totalDiscount.toFixed(2)}`)
+      .text(`Total      : ₹ ${totalAmount.toFixed(2)}`)
       .text('=========================================')
       .fontSize(10)
       .text('Thank you for your purchase!', { align: 'center' })
