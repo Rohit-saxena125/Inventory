@@ -123,7 +123,7 @@ exports.getAllInventory = async (req, res, next) => {
           stockValue: parseFloat(currentStockValue.toFixed(2)),
           isOutOfStock: currentQuantity <= 0,
           isBelowMinQty:
-            currentQuantity <= parseInt(openingStock.minQty) ? true : false,
+            currentQuantity <= parseInt(openingStock?.minQty||0) ? true : false,
           isInactive: lastSaleDate
             ? moment().diff(moment(lastSaleDate), 'days') > 60
             : false,
@@ -316,7 +316,7 @@ exports.reportInventory = async (req, res, next) => {
             stockValue: currentStockValue,
             isOutOfStock: currentQuantity <= 0,
             isBelowMinQty:
-              currentQuantity <= parseInt(openingStock.minQty) ? true : false,
+              currentQuantity <= parseInt(openingStock?.minQty||0) ? true : false,
             isInactive: lastSaleDate
               ? moment().diff(moment(lastSaleDate), 'days') > 60
               : false,

@@ -735,7 +735,7 @@ exports.downloadSalesReport = async (req, res) => {
             createdAt: item.createdAt,
             isOutOfStock: currentQuantity <= 0,
             isBelowMinQty:
-              currentQuantity <= parseInt(openingStock.minQty) ? true : false,
+              currentQuantity <= parseInt(openingStock?.minQty||0) ? true : false,
             isInactive: lastSaleDate
               ? moment().diff(moment(lastSaleDate), 'days') > 60
               : false,
