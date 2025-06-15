@@ -408,7 +408,7 @@ exports.addReduceInventory = async (req, res, next) => {
             quantity: quantity,
             pricePerUnit: pricePerUnit,
             description: description,
-            saleDate: saleDate,
+            saleDate: new Date(saleDate),
           },
         },
         { new: true, runValidators: true }
@@ -421,7 +421,7 @@ exports.addReduceInventory = async (req, res, next) => {
       quantity: quantity,
       pricePerUnit: pricePerUnit?pricePerUnit: 0,
       description: description?description: null,
-      saleDate: saleDate,
+      saleDate: new Date(saleDate),
     });
     return successResponse(res, `Inventory ${type} successfully`);
   } catch (error) {
