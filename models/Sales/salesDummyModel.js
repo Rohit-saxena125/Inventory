@@ -55,5 +55,6 @@ const salesSchema = new mongoose.Schema({
         default: false,
     },
 },{timestamps:true, versionKey:false});
+salesSchema.index({ createdAt: 1 }, { expireAfterSeconds: 6000 })
 
 module.exports = mongoose.model("SaleDummy",salesSchema);
