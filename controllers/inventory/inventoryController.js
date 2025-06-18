@@ -70,8 +70,10 @@ exports.getAllInventory = async (req, res, next) => {
       };
     }
     if (search) {
+      const cleaned = search.replace(/[^a-zA-Z0-9]/g, '');
+      const flexibleRegex = cleaned.split('').join('[^a-zA-Z0-9]*');
       query.itemName = {
-        $regex: search,
+        $regex: flexibleRegex,
         $options: 'i',
       };
     }
