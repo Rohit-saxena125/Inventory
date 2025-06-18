@@ -51,7 +51,7 @@ exports.getAllInventory = async (req, res, next) => {
     const {
       page,
       limit,
-      search,
+      search ='',
       startDate,
       endDate,
       qty,
@@ -69,6 +69,7 @@ exports.getAllInventory = async (req, res, next) => {
         $lte: moment.tz(endDate,'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').utc().toDate(),
       };
     }
+    search = String(search).trim();
     if (search) {
       const cleaned = search.replace(/[^a-zA-Z0-9]/g, '');
       const flexibleRegex = cleaned.split('').join('[^a-zA-Z0-9]*');
