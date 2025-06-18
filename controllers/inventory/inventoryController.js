@@ -403,16 +403,19 @@ exports.addReduceInventory = async (req, res, next) => {
       if (sale.orderType === 'Sale') {
         return badRequestErrorResponse(res, 'Sale stock cannot be updated');
       }
+      const updateFields = {
+  orderType: sale.orderType,
+  quantity,
+  pricePerUnit,
+  description,
+};
+if (saleDate) {
+  updateFields.saleDate = new Date(saleDate);
+}
       sale = await Sale.findByIdAndUpdate(
         { _id: sale._id },
         {
-          $set: {
-            orderType: sale.orderType,
-            quantity: quantity,
-            pricePerUnit: pricePerUnit,
-            description: description,
-            saleDate: new Date(saleDate),
-          },
+           $set: updateFields,
         },
         { new: true, runValidators: true }
       );
