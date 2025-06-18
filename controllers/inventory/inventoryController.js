@@ -48,7 +48,7 @@ exports.createInventory = async (req, res, next) => {
 
 exports.getAllInventory = async (req, res, next) => {
   try {
-    const {
+    let {
       page,
       limit,
       search ='',
