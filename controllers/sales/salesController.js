@@ -883,6 +883,7 @@ function getEffectiveHeaders(headers, type) {
       'Purchase Price',
       'Stock Quantity',
       'Stock Value',
+      'Unit'
     ],
   };
 
@@ -899,7 +900,9 @@ function getEffectiveHeaders(headers, type) {
     headers.unshift('Item Name');
     headers.unshift('Serial Number');
   }
-
+if (!headers.includes('Unit') && !headers.some((h) => h.toLowerCase().includes('unit'))) {
+  headers.push('Unit');
+}
   return headers;
 }
 
@@ -940,6 +943,8 @@ function getValueByHeader(entry, header, index = 0) {
       return entry['stock value'] || '0.00';
     case 'Created By':
       return entry.createdBy || '-';
+    case 'Unit':
+      return entry.unit || entry.itemId?.unit || 'pieces';
     default:
       return entry[header] || '-';
   }
