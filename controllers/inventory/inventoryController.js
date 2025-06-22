@@ -315,7 +315,7 @@ exports.reportInventory = async (req, res, next) => {
                 break;
             }
             currentQuantity = currentQuantity;
-            currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
+            currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
           });
           return {
             item,
