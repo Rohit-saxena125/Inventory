@@ -793,7 +793,7 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     const columnCount = effectiveHeaders.length;
     const tableWidth = 520;
     const columnWidth = tableWidth / columnCount;
-    const rowHeight = 35;
+    const rowHeight = 20;
     const tableTop = doc.y;
 
     // Draw header row
