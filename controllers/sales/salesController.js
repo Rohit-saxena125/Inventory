@@ -735,9 +735,7 @@ exports.downloadSalesReport = async (req, res) => {
               }
               case 'Reduce': {
                 currentQuantity -= quantitySet;
-                let stockValue = parseFloat(
-                  Math.abs(quantitySet) * pricePerUnit
-                );
+                let stockValue = Math.abs(quantitySet) * pricePerUnit
                 currentStockValue -= stockValue;
                 break;
               }
