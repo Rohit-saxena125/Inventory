@@ -685,6 +685,7 @@ exports.downloadSalesReport = async (req, res) => {
       let inventory = await Inventory.find(query).sort({
         createdAt: -1,
       });
+      let totalStockValue = 0;
       inventory = await Promise.all(
         inventory.map(async (item) => {
           let openingStock = await Sale.findOne({
@@ -725,6 +726,7 @@ exports.downloadSalesReport = async (req, res) => {
             }
             currentQuantity = currentQuantity;
             currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
+            totalStockValue += currentStockValue;
           });
           return {
             itemName: item.itemName,
@@ -755,9 +757,9 @@ exports.downloadSalesReport = async (req, res) => {
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
       if (format === 'pdf') {
-        await createSalesReportPDF(inventory, headers, outputPath, type);
+        await createSalesReportPDF(inventory, headers, outputPath, type,totalStockValue);
       } else if (format === 'csv') {
-        await createSalesReportCSV(inventory, headers, outputPath, type);
+        await createSalesReportCSV(inventory, headers, outputPath, type,totalStockValue);
       } else {
         return badRequestErrorResponse(
           res,
@@ -777,7 +779,7 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
-async function createSalesReportPDF(data, headers, outputPath, type) {
+async function createSalesReportPDF(data, headers, outputPath, type,totalStockValue = 0) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     const stream = fs.createWriteStream(outputPath);
@@ -882,14 +884,21 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
       doc.moveTo(30, y + rowHeight).lineTo(30 + tableWidth, y + rowHeight).stroke();
       y += rowHeight;
     });
-
+    // add total stock value if applicable
+    if (type === 'Inventory') {
+      doc.moveTo(30, y).lineTo(30 + tableWidth, y).stroke();
+      y += 10;
+      doc.font('Helvetica-Bold').fontSize(10).text(`Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`, {
+        align: 'right',
+        width: tableWidth - 60,
+      });
+      y += 10;
+    }
     doc.end();
     stream.on('finish', () => resolve(outputPath));
     stream.on('error', reject);
   });
 }
-
-
 
 function getEffectiveHeaders(headers, type) {
   const defaultHeaders = {
@@ -974,7 +983,7 @@ function getValueByHeader(entry, header, index = 0) {
   }
 }
 
-async function createSalesReportCSV(data, headers, outputPath, type) {
+async function createSalesReportCSV(data, headers, outputPath, type, totalStockValue = 0) {
   return new Promise((resolve, reject) => {
     const effectiveHeaders = getEffectiveHeaders(headers, type);
     const csvRows = [];
@@ -991,7 +1000,11 @@ async function createSalesReportCSV(data, headers, outputPath, type) {
       });
       csvRows.push(row.join(','));
     });
-
+    // Add total stock value if applicable
+    if (type === 'Inventory') {
+      csvRows.push(`"Total Stock Value",,"Rs. ${totalStockValue.toFixed(2)}"`);
+    }
+    // Write to file
     fs.writeFile(outputPath, csvRows.join('\n'), 'utf8', (err) => {
       if (err) reject(err);
       else resolve(outputPath);
