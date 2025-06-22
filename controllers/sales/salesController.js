@@ -743,7 +743,7 @@ exports.downloadSalesReport = async (req, res) => {
                 break;
             }
             currentQuantity = currentQuantity;
-            totalStockValue += currentStockValue;
+            totalStockValue += Math.abs(currentStockValue);
             currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
           });
           return {
