@@ -783,7 +783,7 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     doc.pipe(stream);
 
     // Title
-    doc.fontSize(18).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
+    doc.fontSize(14).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
 
     // Ensure standard headers are used
     const effectiveHeaders = getEffectiveHeaders(headers, type);
@@ -792,7 +792,7 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     const columnCount = effectiveHeaders.length;
     const tableWidth = 520;
     const columnWidth = tableWidth / columnCount;
-    const rowHeight = 26;
+    const rowHeight = 35;
     const tableTop = doc.y;
 
     // Draw header row
