@@ -16,8 +16,16 @@ const moment = require('moment-timezone');
 
 exports.fetchSales = async (req, res) => {
   try {
-    const { page, limit, search, itemId, startDate, endDate, userId,invoiceNumber } =
-      req.query;
+    const {
+      page,
+      limit,
+      search,
+      itemId,
+      startDate,
+      endDate,
+      userId,
+      invoiceNumber,
+    } = req.query;
     const query = { isDeleted: false };
     if (itemId) {
       query.itemId = itemId;
@@ -175,7 +183,10 @@ exports.createFinalSales = async (req, res) => {
 exports.fetchDummySales = async (req, res) => {
   try {
     const { invoiceNumber } = req.query;
-    let sales = await SaleDummy.find({ invoiceNumber: invoiceNumber ,createdBy: req.user._id})
+    let sales = await SaleDummy.find({
+      invoiceNumber: invoiceNumber,
+      createdBy: req.user._id,
+    })
       .populate('itemId')
       .populate('createdBy');
     if (!sales) {
@@ -282,7 +293,7 @@ exports.deleteSalesDummy = async (req, res) => {
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
-}
+};
 
 exports.updateSales = async (req, res) => {
   try {
@@ -448,8 +459,14 @@ exports.fetchSalesReport = async (req, res) => {
     }
     if (startDate && endDate) {
       query.saleDate = {
-        $gte: moment.tz(startDate,'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').toDate(),
-        $lte: moment.tz(endDate,'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').toDate(),
+        $gte: moment
+          .tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata')
+          .startOf('day')
+          .toDate(),
+        $lte: moment
+          .tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata')
+          .endOf('day')
+          .toDate(),
       };
     }
     const sales = await Sale.find(query)
@@ -593,7 +610,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
   });
 }
 
-
 exports.downloadSalesReport = async (req, res) => {
   try {
     const {
@@ -625,7 +641,7 @@ exports.downloadSalesReport = async (req, res) => {
       sales.forEach((sale) => {
         const invoiceNumber = sale.invoiceNumber;
         const saleCreatedBy = sale.createdBy?._id;
-      const key = `${invoiceNumber}-${saleCreatedBy}`;
+        const key = `${invoiceNumber}-${saleCreatedBy}`;
         const price = parseFloat(sale.pricePerUnit || 0);
         const qty = parseInt(sale.quantity, 10) || 0;
         const amount = price * qty;
@@ -705,26 +721,38 @@ exports.downloadSalesReport = async (req, res) => {
               lastSaleDate = sale.createdAt;
             }
             switch (sale.orderType) {
-              case 'Opening':
+              case 'Opening': {
                 currentQuantity += quantitySet;
-
-                currentStockValue += quantitySet * pricePerUnit;
+                const stockValue = parseFloat(
+                  Math.abs(quantitySet * pricePerUnit)
+                );
+                currentStockValue += stockValue;
                 break;
-              case 'Add':
+              }
+              case 'Add': {
                 currentQuantity += quantitySet;
-                currentStockValue += quantitySet * pricePerUnit;
+                const stockValue = parseFloat(
+                  Math.abs(quantitySet * pricePerUnit)
+                );
+                currentStockValue += stockValue;
                 break;
-              case 'Reduce':
+              }
+              case 'Reduce': {
                 currentQuantity -= quantitySet;
-                currentStockValue -= quantitySet * pricePerUnit;
+                let stockValue = parseFloat(
+                  Math.abs(quantitySet * pricePerUnit)
+                );
+                currentStockValue -= stockValue;
                 break;
-              case 'Sales':
+              }
+              case 'Sales': {
                 if (currentQuantity <= 0) break;
                 const avgCost = currentStockValue / currentQuantity;
                 const costOfGoodsSold = quantitySet * avgCost;
                 currentQuantity -= quantitySet;
                 currentStockValue -= costOfGoodsSold;
                 break;
+              }
               default:
                 break;
             }
@@ -742,7 +770,9 @@ exports.downloadSalesReport = async (req, res) => {
             createdAt: item.createdAt,
             isOutOfStock: currentQuantity <= 0,
             isBelowMinQty:
-              currentQuantity <= parseInt(openingStock?.minQty||0) ? true : false,
+              currentQuantity <= parseInt(openingStock?.minQty || 0)
+                ? true
+                : false,
             isInactive: lastSaleDate
               ? moment().diff(moment(lastSaleDate), 'days') > 60
               : false,
@@ -761,9 +791,21 @@ exports.downloadSalesReport = async (req, res) => {
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
       if (format === 'pdf') {
-        await createSalesReportPDF(inventory, headers, outputPath, type,totalStockValue);
+        await createSalesReportPDF(
+          inventory,
+          headers,
+          outputPath,
+          type,
+          totalStockValue
+        );
       } else if (format === 'csv') {
-        await createSalesReportCSV(inventory, headers, outputPath, type,totalStockValue);
+        await createSalesReportCSV(
+          inventory,
+          headers,
+          outputPath,
+          type,
+          totalStockValue
+        );
       } else {
         return badRequestErrorResponse(
           res,
@@ -783,7 +825,13 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
-async function createSalesReportPDF(data, headers, outputPath, type,totalStockValue = 0) {
+async function createSalesReportPDF(
+  data,
+  headers,
+  outputPath,
+  type,
+  totalStockValue = 0
+) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     const stream = fs.createWriteStream(outputPath);
@@ -808,7 +856,8 @@ async function createSalesReportPDF(data, headers, outputPath, type,totalStockVa
     });
 
     // Distribute remaining equally to other headers
-    const equalWidth = remainingWidth / (columnCount - Object.keys(customWidths).length);
+    const equalWidth =
+      remainingWidth / (columnCount - Object.keys(customWidths).length);
     effectiveHeaders.forEach((header) => {
       if (!customWidths[header]) {
         customWidths[header] = equalWidth;
@@ -830,7 +879,10 @@ async function createSalesReportPDF(data, headers, outputPath, type,totalStockVa
 
     // Header underline
     y += 20;
-    doc.moveTo(30, y).lineTo(30 + tableWidth, y).stroke();
+    doc
+      .moveTo(30, y)
+      .lineTo(30 + tableWidth, y)
+      .stroke();
     y += 2;
 
     // Draw rows
@@ -862,7 +914,10 @@ async function createSalesReportPDF(data, headers, outputPath, type,totalStockVa
           x += customWidths[header];
         });
         y += 22;
-        doc.moveTo(30, y).lineTo(30 + tableWidth, y).stroke();
+        doc
+          .moveTo(30, y)
+          .lineTo(30 + tableWidth, y)
+          .stroke();
         y += 2;
       }
 
@@ -872,39 +927,52 @@ async function createSalesReportPDF(data, headers, outputPath, type,totalStockVa
         const value = getValueByHeader(entry, header, index).toString();
 
         // Draw borders
-        doc.moveTo(x, y).lineTo(x, y + rowHeight).stroke();
-        doc.moveTo(x + customWidths[header], y).lineTo(x + customWidths[header], y + rowHeight).stroke();
+        doc
+          .moveTo(x, y)
+          .lineTo(x, y + rowHeight)
+          .stroke();
+        doc
+          .moveTo(x + customWidths[header], y)
+          .lineTo(x + customWidths[header], y + rowHeight)
+          .stroke();
 
         // Text
-        doc.font('Helvetica').fontSize(10).text(value, x + 5, y + 5, {
-          width: customWidths[header] - 10,
-          align: 'left',
-        });
+        doc
+          .font('Helvetica')
+          .fontSize(10)
+          .text(value, x + 5, y + 5, {
+            width: customWidths[header] - 10,
+            align: 'left',
+          });
 
         x += customWidths[header];
       });
 
       // Bottom border
-      doc.moveTo(30, y + rowHeight).lineTo(30 + tableWidth, y + rowHeight).stroke();
+      doc
+        .moveTo(30, y + rowHeight)
+        .lineTo(30 + tableWidth, y + rowHeight)
+        .stroke();
       y += rowHeight;
     });
     if (type === 'Inventory') {
-  const totalRowHeight = 20;
-  doc.moveTo(30, y).lineTo(30 + tableWidth, y).stroke();
-  y += 5;
+      const totalRowHeight = 20;
+      doc
+        .moveTo(30, y)
+        .lineTo(30 + tableWidth, y)
+        .stroke();
+      y += 5;
 
-  doc.font('Helvetica-Bold').fontSize(10).text(
-    `Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`,
-    30,
-    y,
-    {
-      align: 'right',
-      width: tableWidth,
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(`Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`, 30, y, {
+          align: 'right',
+          width: tableWidth,
+        });
+
+      y += totalRowHeight;
     }
-  );
-
-  y += totalRowHeight;
-}
 
     doc.end();
     stream.on('finish', () => resolve(outputPath));
@@ -928,7 +996,7 @@ function getEffectiveHeaders(headers, type) {
       'Purchase Price',
       'Stock Quantity',
       'Stock Value',
-      'Unit'
+      'Unit',
     ],
   };
 
@@ -945,9 +1013,12 @@ function getEffectiveHeaders(headers, type) {
     headers.unshift('Item Name');
     headers.unshift('Serial Number');
   }
-if (!headers.includes('Unit') && !headers.some((h) => h.toLowerCase().includes('unit'))) {
-  headers.push('Unit');
-}
+  if (
+    !headers.includes('Unit') &&
+    !headers.some((h) => h.toLowerCase().includes('unit'))
+  ) {
+    headers.push('Unit');
+  }
   return headers;
 }
 
@@ -995,7 +1066,13 @@ function getValueByHeader(entry, header, index = 0) {
   }
 }
 
-async function createSalesReportCSV(data, headers, outputPath, type, totalStockValue = 0) {
+async function createSalesReportCSV(
+  data,
+  headers,
+  outputPath,
+  type,
+  totalStockValue = 0
+) {
   return new Promise((resolve, reject) => {
     const effectiveHeaders = getEffectiveHeaders(headers, type);
     const csvRows = [];
