@@ -721,8 +721,8 @@ exports.downloadSalesReport = async (req, res) => {
               lastSaleDate = sale.createdAt;
             }
             switch (sale.orderType) {
-              case 'Opening':
-              case 'Add':
+              case 'Opening': 
+              case 'Add': 
                 currentQuantity += quantitySet;
                 currentStockValue += quantitySet * pricePerUnit;
                 break;
@@ -742,10 +742,10 @@ exports.downloadSalesReport = async (req, res) => {
               default:
                 break;
             }
+            currentQuantity = currentQuantity;
+            totalStockValue += currentStockValue;
+            currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
           });
-          currentQuantity = currentQuantity;
-          totalStockValue += Math.abs(currentStockValue);
-          currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
           return {
             itemName: item.itemName,
             units: item.units,
