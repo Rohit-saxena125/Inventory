@@ -706,6 +706,9 @@ exports.downloadSalesReport = async (req, res) => {
             }
             switch (sale.orderType) {
               case 'Opening':
+                currentQuantity += quantitySet;
+                currentStockValue += Math.abs(quantitySet * pricePerUnit);
+                break;
               case 'Add':
                 currentQuantity += quantitySet;
                 currentStockValue += Math.abs(quantitySet * pricePerUnit);
