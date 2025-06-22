@@ -300,7 +300,7 @@ exports.reportInventory = async (req, res, next) => {
               case 'Opening':
               case 'Add':
                 currentQuantity += quantity;
-                currentStockValue += Math.abs(quantity) * pricePerUnit;
+                currentStockValue += Math.abs(quantity * pricePerUnit);
                 break;
               case 'Reduce':
                 currentQuantity -= quantity;
