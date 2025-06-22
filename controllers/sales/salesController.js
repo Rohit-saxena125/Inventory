@@ -884,16 +884,24 @@ async function createSalesReportPDF(data, headers, outputPath, type,totalStockVa
       doc.moveTo(30, y + rowHeight).lineTo(30 + tableWidth, y + rowHeight).stroke();
       y += rowHeight;
     });
-    // add total stock value if applicable
     if (type === 'Inventory') {
-      doc.moveTo(30, y).lineTo(30 + tableWidth, y).stroke();
-      y += 10;
-      doc.font('Helvetica-Bold').fontSize(10).text(`Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`, {
-        align: 'right',
-        width: tableWidth - 60,
-      });
-      y += 10;
+  const totalRowHeight = 20;
+  doc.moveTo(30, y).lineTo(30 + tableWidth, y).stroke();
+  y += 5;
+
+  doc.font('Helvetica-Bold').fontSize(10).text(
+    `Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`,
+    30,
+    y,
+    {
+      align: 'right',
+      width: tableWidth,
     }
+  );
+
+  y += totalRowHeight;
+}
+
     doc.end();
     stream.on('finish', () => resolve(outputPath));
     stream.on('error', reject);
