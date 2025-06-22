@@ -341,7 +341,7 @@ exports.reportInventory = async (req, res, next) => {
       }
       const noOFItems = inventoryCalculations.length;
       const totalStockValue = inventoryCalculations.reduce(
-        (sum, calc) => sum + calc.stockValue,
+        (sum, calc) => sum + Math.abs(calc.stockValue),
         0
       );
       const lowStockCount = inventoryCalculations.filter(
