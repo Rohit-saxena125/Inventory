@@ -786,80 +786,98 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     // Title
     doc.fontSize(14).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
 
-    // Ensure standard headers are used
+    // Get effective headers
     const effectiveHeaders = getEffectiveHeaders(headers, type);
 
-    // Calculate column widths
     const columnCount = effectiveHeaders.length;
     const tableWidth = 520;
     const columnWidth = tableWidth / columnCount;
-    const rowHeight = 20;
-    const tableTop = doc.y;
+    let y = doc.y;
 
     // Draw header row
     doc.font('Helvetica-Bold').fontSize(10);
     effectiveHeaders.forEach((header, i) => {
-      doc.text(header, 30 + i * columnWidth, tableTop, {
+      doc.text(header, 30 + i * columnWidth, y, {
         width: columnWidth,
         align: 'left',
       });
     });
 
-    // Draw header underline
+    // Header underline
+    y += 20;
     doc
-      .moveTo(30, tableTop + rowHeight)
-      .lineTo(30 + tableWidth, tableTop + rowHeight)
+      .moveTo(30, y)
+      .lineTo(30 + tableWidth, y)
       .lineWidth(1)
       .stroke();
 
     // Draw data rows
-    let y = tableTop + rowHeight;
+    y += 2;
     data.forEach((entry, index) => {
-      // Draw left border
-      doc
-        .moveTo(30, y)
-        .lineTo(30, y + rowHeight)
-        .stroke();
+      const rowStartY = y;
 
-      effectiveHeaders.forEach((header, i) => {
-        const x = 30 + i * columnWidth;
-        const value = getValueByHeader(entry, header, index);
-
-        // Draw cell content
-        doc.font('Helvetica').fontSize(10);
-        doc.text(value.toString(), x + 5, y + 5, {
+      // Calculate height needed for each cell in this row
+      const rowHeights = effectiveHeaders.map((header, i) => {
+        const value = getValueByHeader(entry, header, index).toString();
+        return doc.heightOfString(value, {
           width: columnWidth - 10,
           align: 'left',
         });
+      });
 
-        // Draw right border
+      const rowHeight = Math.max(...rowHeights, 20) + 8; // +8 padding
+
+      // Page break
+      if (y + rowHeight > doc.page.height - 50) {
+        doc.addPage();
+        y = 50;
+
+        // Re-draw headers on new page
+        doc.font('Helvetica-Bold').fontSize(10);
+        effectiveHeaders.forEach((header, i) => {
+          doc.text(header, 30 + i * columnWidth, y, {
+            width: columnWidth,
+            align: 'left',
+          });
+        });
+        y += 22;
+        doc
+          .moveTo(30, y)
+          .lineTo(30 + tableWidth, y)
+          .stroke();
+        y += 2;
+      }
+
+      // Draw borders and cell content
+      effectiveHeaders.forEach((header, i) => {
+        const x = 30 + i * columnWidth;
+        const value = getValueByHeader(entry, header, index).toString();
+
+        // Cell border
+        doc
+          .moveTo(x, y)
+          .lineTo(x, y + rowHeight)
+          .stroke();
+
         doc
           .moveTo(x + columnWidth, y)
           .lineTo(x + columnWidth, y + rowHeight)
           .stroke();
+
+        // Cell text
+        doc.font('Helvetica').fontSize(10).text(value, x + 5, y + 5, {
+          width: columnWidth - 10,
+          align: 'left',
+        });
       });
 
-      // Draw bottom border
+      // Bottom row border
       doc
         .moveTo(30, y + rowHeight)
         .lineTo(30 + tableWidth, y + rowHeight)
         .stroke();
 
       y += rowHeight;
-
-      // Handle page break
-      if (y > doc.page.height - 50) {
-        doc.addPage();
-        y = 50;
-        // Redraw header on new page
-        doc.font('Helvetica-Bold').fontSize(10);
-        effectiveHeaders.forEach((header, i) => {
-          doc.text(header, 30 + i * columnWidth, y - rowHeight, {
-            width: columnWidth,
-            align: 'left',
-          });
-        });
-      }
     });
 
     doc.end();
@@ -867,6 +885,7 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     stream.on('error', reject);
   });
 }
+
 
 function getEffectiveHeaders(headers, type) {
   const defaultHeaders = {
