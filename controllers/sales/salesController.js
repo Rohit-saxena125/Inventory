@@ -724,7 +724,7 @@ exports.downloadSalesReport = async (req, res) => {
               case 'Opening': {
                 currentQuantity += quantitySet;
                 const stockValue = parseFloat(
-                  Math.abs(quantitySet * pricePerUnit)
+                  Math.abs(quantitySet) * pricePerUnit
                 );
                 currentStockValue += stockValue;
                 break;
@@ -732,7 +732,7 @@ exports.downloadSalesReport = async (req, res) => {
               case 'Add': {
                 currentQuantity += quantitySet;
                 const stockValue = parseFloat(
-                  Math.abs(quantitySet * pricePerUnit)
+                  Math.abs(quantitySet) * pricePerUnit
                 );
                 currentStockValue += stockValue;
                 break;
@@ -740,7 +740,7 @@ exports.downloadSalesReport = async (req, res) => {
               case 'Reduce': {
                 currentQuantity -= quantitySet;
                 let stockValue = parseFloat(
-                  Math.abs(quantitySet * pricePerUnit)
+                  Math.abs(quantitySet) * pricePerUnit
                 );
                 currentStockValue -= stockValue;
                 break;
