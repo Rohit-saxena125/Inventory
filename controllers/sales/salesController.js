@@ -724,13 +724,11 @@ exports.downloadSalesReport = async (req, res) => {
               case 'Opening': 
               case 'Add': 
                 currentQuantity += quantitySet;
-                const stockValue = Math.abs(quantitySet) * pricePerUnit
-                currentStockValue += stockValue;
+                currentStockValue += quantitySet * pricePerUnit;
                 break;
               case 'Reduce': {
                 currentQuantity -= quantitySet;
-                let stockValue = Math.abs(quantitySet) * pricePerUnit
-                currentStockValue -= stockValue;
+                currentStockValue -= quantitySet * pricePerUnit;
                 break;
               }
               case 'Sales': {
