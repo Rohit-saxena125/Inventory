@@ -250,6 +250,10 @@ exports.deleteInventory = async (req, res, next) => {
     if (!inventory) {
       return badRequestErrorResponse(res, 'Inventory not found');
     }
+    let sales = await Sale.find({ itemId: inventory._id,type: 'Inventory' });
+    if (sales.length > 0) {
+      await Sale.deleteMany({ itemId: inventory._id, type: 'Inventory' });
+    }
     return successResponse(res, 'Inventory deleted successfully');
   } catch (error) {
     return internalServerErrorResponse(res, error);

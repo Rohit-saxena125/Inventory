@@ -792,7 +792,7 @@ async function createSalesReportPDF(data, headers, outputPath, type) {
     const columnCount = effectiveHeaders.length;
     const tableWidth = 520;
     const columnWidth = tableWidth / columnCount;
-    const rowHeight = 20;
+    const rowHeight = 23;
     const tableTop = doc.y;
 
     // Draw header row
@@ -944,7 +944,7 @@ function getValueByHeader(entry, header, index = 0) {
     case 'Created By':
       return entry.createdBy || '-';
     case 'Unit':
-      return entry.unit || entry.itemId?.unit || 'pieces';
+      return entry.units || entry.itemId?.units || 'pieces';
     default:
       return entry[header] || '-';
   }
