@@ -728,6 +728,7 @@ exports.downloadSalesReport = async (req, res) => {
           });
           return {
             itemName: item.itemName,
+            units: item.units,
             salesPrice: item.salePrice || 0,
             purchasePrice: item.purchasePrice || 0,
             quantity: currentQuantity,
