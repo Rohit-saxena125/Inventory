@@ -701,7 +701,6 @@ exports.downloadSalesReport = async (req, res) => {
       let inventory = await Inventory.find(query).sort({
         createdAt: -1,
       });
-      let totalStockValue = 0;
       inventory = await Promise.all(
         inventory.map(async (item) => {
           let openingStock = await Sale.findOne({
@@ -744,7 +743,6 @@ exports.downloadSalesReport = async (req, res) => {
             }
             currentQuantity = currentQuantity;
             currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
-            totalStockValue += currentStockValue;
           });
           return {
             itemName: item.itemName,
@@ -774,6 +772,10 @@ exports.downloadSalesReport = async (req, res) => {
       if (inActive) {
         inventory = inventory.filter((item) => item.isInactive);
       }
+      const totalStockValue = inventory.reduce(
+        (acc, item) => acc + parseFloat(item['stock value']),
+        0
+      );
       const fileName = `inventory-report-${Date.now()}.${format}`;
       const outputPath = path.join(__dirname, fileName);
       if (format === 'pdf') {
