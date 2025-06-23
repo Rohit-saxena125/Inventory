@@ -532,8 +532,19 @@ function parseAmount(val) {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
+    // Calculate dynamic height based on items (now considering multi-line names)
+    const baseHeight = 500;
+    const lineHeight = 30;
+    let estimatedLines = invoiceDataArray.length;
+    
+    // Pre-calculate how many lines each item name will take
+    invoiceDataArray.forEach(sale => {
+      const itemName = sale.itemId.itemName;
+      estimatedLines += Math.max(0, Math.ceil(itemName.length / 12) - 1);
+    });
+
     const doc = new PDFDocument({
-      size: [288, 500 + invoiceDataArray.length * 30], // 80mm wide
+      size: [288, baseHeight + estimatedLines * lineHeight], // 80mm wide
       margins: { top: 10, bottom: 10, left: 10, right: 10 },
     });
 
@@ -583,9 +594,23 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const rate = `Rs. ${parseFloat(sale.pricePerUnit).toFixed(2)}`;
       const amount = parseAmount(sale.totalAmount).toFixed(2);
 
+      // Split long item names into multiple lines
+      const maxItemNameWidth = 12; // Characters
+      const nameLines = [];
+      
+      for (let i = 0; i < itemName.length; i += maxItemNameWidth) {
+        nameLines.push(itemName.substring(i, i + maxItemNameWidth));
+      }
+
+      // First line with all details
       doc.text(
-        `${itemName.padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs. ${amount}`
+        `${nameLines[0].padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs. ${amount}`
       );
+
+      // Subsequent lines (just the item name continuation)
+      for (let i = 1; i < nameLines.length; i++) {
+        doc.text(nameLines[i]);
+      }
 
       const discount = parseAmount(sale.discount);
       totalDiscount += discount;
@@ -609,7 +634,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
-
 exports.downloadSalesReport = async (req, res) => {
   try {
     const {
