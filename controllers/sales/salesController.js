@@ -131,7 +131,7 @@ exports.createSales = async (req, res) => {
       itemId,
       customerName,
       discount,
-      totalAmount:parseFloat((pricePerUnit*quantity)-discount).toFixed(2),
+      totalAmount,
       invoiceNumber,
       createdBy: req.user._id,
     });
