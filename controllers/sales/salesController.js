@@ -580,6 +580,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     let totalDiscount = 0;
     let totalAmount = 0;
+    let totalQty = 0;
 
     // Table Heading
     doc
@@ -613,6 +614,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       }
 
       const discount = parseAmount(sale.discount);
+      totalQty += parseInt(qty, 10) || 0;
       totalDiscount += discount;
       totalAmount += parseFloat(amount);
     });
@@ -622,6 +624,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .text('----------------------------------------')
       .font('Courier-Bold')
       .text(`Discount   : Rs. ${totalDiscount.toFixed(2)}`)
+      .text(`Total Quantity  : ${totalQty}`)
       .text(`Total      : Rs. ${totalAmount.toFixed(2)}`)
       .text('=========================================')
       .fontSize(10)
