@@ -530,27 +530,29 @@ function parseAmount(val) {
   return 0;
 }
 
-
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    const lineHeight = 16;
-    const pageWidth = 288;
-    const margins = { left: 10, right: 10 };
-    const usableWidth = pageWidth - margins.left - margins.right;
-
-    const estLines = invoiceDataArray.reduce((sum, sale) => {
-      return sum + Math.ceil(sale.itemId.itemName.length / 24);
-    }, 0);
+    // Calculate dynamic height based on items (now considering multi-line names)
+    const baseHeight = 500;
+    const lineHeight = 30;
+    let estimatedLines = invoiceDataArray.length;
+    
+    // Pre-calculate how many lines each item name will take
+    invoiceDataArray.forEach(sale => {
+      const itemName = sale.itemId.itemName;
+      estimatedLines += Math.max(0, Math.ceil(itemName.length / 12) - 1);
+    });
 
     const doc = new PDFDocument({
-      size: [pageWidth, 300 + estLines * lineHeight],
+      size: [288, baseHeight + estimatedLines * lineHeight], // 80mm wide
       margins: { top: 10, bottom: 10, left: 10, right: 10 },
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
-    const firstSale = invoiceDataArray[0];
+    const firstSale = invoiceDataArray[0]; // Assuming all sales are from the same invoice
+
     const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -560,84 +562,74 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit',
     });
 
-    // Header
-    doc.font('Courier-Bold').fontSize(9);
-    doc.text('-'.repeat(usableWidth));
-    doc.font('Courier').fontSize(8);
-    doc.text(`Customer   : ${firstSale.customerName || 'N/A'}`);
-    doc.text(`Invoice No : ${firstSale.invoiceNumber}`);
-    doc.text(`Date       : ${formattedDate}`);
-    doc.text('-'.repeat(usableWidth));
+    // HEADER
+    doc
+      .fontSize(12)
+      .font('Courier-Bold')
+      .text('', { align: 'center' })
+      .fontSize(9)
+      .text('------------------------------------');
 
-    // Column positions
-    const xSno = margins.left;
-    const xItem = xSno + 25;
-    const xQty = xItem + 105;
-    const xRate = xQty + 28;
-    const xAmt = xRate + 40;
+    // Customer + Invoice Info
+    doc
+      .font('Courier')
+      .text(`Customer   : ${firstSale.customerName}`)
+      .text(`Invoice No : ${firstSale.invoiceNumber}`)
+      .text(`Date       : ${formattedDate}`)
+      .text('-------------------------------------');
 
-    // Column Headers
-    doc.font('Courier-Bold').fontSize(8);
-    doc.text('S.No', xSno, doc.y);
-    doc.text('Item Name', xItem);
-    doc.text('Qty', xQty);
-    doc.text('Rate', xRate);
-    doc.text('Amt', xAmt);
-    doc.moveDown(0.2);
-    doc.font('Courier').fontSize(8);
-
-    // Totals
-    let totalQty = 0;
-    let totalAmount = 0;
     let totalDiscount = 0;
+    let totalAmount = 0;
+    let totalQty = 0;
 
-    invoiceDataArray.forEach((sale, index) => {
+    // Table Heading
+    doc
+      .font('Courier-Bold')
+      .text('Item        Qty       Rate       Amt')
+      .font('Courier');
+
+    // Items Loop
+    invoiceDataArray.forEach((sale) => {
       const itemName = sale.itemId.itemName;
       const qty = sale.quantity.toString();
-      const rate = parseFloat(sale.pricePerUnit).toFixed(2);
+      const rate = `Rs. ${parseFloat(sale.pricePerUnit).toFixed(2)}`;
       const amount = parseAmount(sale.totalAmount).toFixed(2);
+
+      // Split long item names into multiple lines
+      const maxItemNameWidth = 12; // Characters
       const nameLines = [];
-
-      for (let i = 0; i < itemName.length; i += 24) {
-        nameLines.push(itemName.substring(i, i + 24));
+      
+      for (let i = 0; i < itemName.length; i += maxItemNameWidth) {
+        nameLines.push(itemName.substring(i, i + maxItemNameWidth));
       }
 
-      const y = doc.y;
-      doc.text(`${index + 1}`, xSno, y);
-      doc.text(nameLines[0], xItem, y);
-      doc.text(qty, xQty, y, { width: 25, align: 'right' });
-      doc.text(`Rs.${rate}`, xRate, y, { width: 40, align: 'right' });
-      doc.text(`Rs.${amount}`, xAmt, y, { width: 48, align: 'right' });
+      // First line with all details
+      doc.text(
+        `${nameLines[0].padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs. ${amount}`
+      );
 
+      // Subsequent lines (just the item name continuation)
       for (let i = 1; i < nameLines.length; i++) {
-        doc.text('', xSno);
-        doc.text(nameLines[i], xItem);
+        doc.text(nameLines[i]);
       }
 
+      const discount = parseAmount(sale.discount);
       totalQty += parseInt(qty, 10) || 0;
+      totalDiscount += discount;
       totalAmount += parseFloat(amount);
-      totalDiscount += parseAmount(sale.discount);
     });
 
-    // Final Summary
-    const grandTotal = totalAmount - totalDiscount;
-
-    doc.moveDown(0.5);
-    doc.font('Courier-Bold');
-    doc.text('-'.repeat(usableWidth));
-    doc.text('', xSno); // padding
-
-    // Summary aligned under correct columns
-    const summaryY = doc.y;
-    doc.text(`${totalQty}`, xQty, summaryY, { width: 25, align: 'right' });
-    doc.text(`Rs.${totalAmount.toFixed(2)}`, xAmt, summaryY, { width: 48, align: 'right' });
-
-    doc.text(`Discount     : Rs.${totalDiscount.toFixed(2)}`, xItem);
-    doc.text(`Grand Total  : Rs.${grandTotal.toFixed(2)}`, xItem);
-
-    doc.text('='.repeat(usableWidth));
-    doc.fontSize(9).text('Thank you for your purchase!', { align: 'center' });
-    doc.text('Visit Again', { align: 'center' });
+    doc
+      .font('Courier')
+      .text('----------------------------------------')
+      .font('Courier-Bold')
+      .text(`Discount   : Rs. ${totalDiscount.toFixed(2)}`)
+      .text(`Total Quantity  : ${totalQty}`)
+      .text(`Total      : Rs. ${totalAmount.toFixed(2)}`)
+      .text('=========================================')
+      .fontSize(10)
+      .text('Thank you for your purchase!', { align: 'center' })
+      .text('Visit Again', { align: 'center' });
 
     doc.end();
 
@@ -645,9 +637,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
-
-
-
 exports.downloadSalesReport = async (req, res) => {
   try {
     const {
