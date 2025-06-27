@@ -533,17 +533,17 @@ function parseAmount(val) {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    const lineHeight = 18;
-    const baseHeight = 500;
-    let estimatedLines = 0;
+    const lineHeight = 16;
+    const pageWidth = 288;
+    const margins = { left: 10, right: 10 };
+    const usableWidth = pageWidth - margins.left - margins.right;
 
-    invoiceDataArray.forEach(sale => {
-      const nameLength = sale.itemId.itemName.length;
-      estimatedLines += Math.ceil(nameLength / 24); // 24 chars max per line
-    });
+    const estLines = invoiceDataArray.reduce((sum, sale) => {
+      return sum + Math.ceil(sale.itemId.itemName.length / 24);
+    }, 0);
 
     const doc = new PDFDocument({
-      size: [288, baseHeight + estimatedLines * lineHeight],
+      size: [pageWidth, 300 + estLines * lineHeight],
       margins: { top: 10, bottom: 10, left: 10, right: 10 },
     });
 
@@ -562,29 +562,31 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     // Header
     doc.font('Courier-Bold').fontSize(9);
-    doc.text('----------------------------------------');
-    doc.font('Courier');
+    doc.text('-'.repeat(usableWidth));
+    doc.font('Courier').fontSize(8);
     doc.text(`Customer   : ${firstSale.customerName || 'N/A'}`);
     doc.text(`Invoice No : ${firstSale.invoiceNumber}`);
     doc.text(`Date       : ${formattedDate}`);
-    doc.text('----------------------------------------');
+    doc.text('-'.repeat(usableWidth));
 
-    // Table headers
-    const colSNo = 10;
-    const colItem = 35;
-    const colQty = 160;
-    const colRate = 190;
-    const colAmt = 230;
+    // Column positions
+    const xSno = margins.left;
+    const xItem = xSno + 25;
+    const xQty = xItem + 105;
+    const xRate = xQty + 28;
+    const xAmt = xRate + 40;
 
-    doc.font('Courier-Bold');
-    doc.text('S.No', colSNo, doc.y);
-    doc.text('Item Name', colItem, doc.y);
-    doc.text('Qty', colQty, doc.y);
-    doc.text('Rate', colRate, doc.y);
-    doc.text('Amt', colAmt, doc.y);
+    // Column Headers
+    doc.font('Courier-Bold').fontSize(8);
+    doc.text('S.No', xSno, doc.y);
+    doc.text('Item Name', xItem);
+    doc.text('Qty', xQty);
+    doc.text('Rate', xRate);
+    doc.text('Amt', xAmt);
     doc.moveDown(0.2);
     doc.font('Courier').fontSize(8);
 
+    // Totals
     let totalQty = 0;
     let totalAmount = 0;
     let totalDiscount = 0;
@@ -600,18 +602,16 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         nameLines.push(itemName.substring(i, i + 24));
       }
 
-      // Print first line with all columns
       const y = doc.y;
-      doc.text(`${index + 1}`, colSNo, y);
-      doc.text(nameLines[0], colItem, y);
-      doc.text(qty, colQty, y, { width: 25, align: 'right' });
-      doc.text(`Rs.${rate}`, colRate, y, { width: 35, align: 'right' });
-      doc.text(`Rs.${amount}`, colAmt, y, { width: 45, align: 'right' });
+      doc.text(`${index + 1}`, xSno, y);
+      doc.text(nameLines[0], xItem, y);
+      doc.text(qty, xQty, y, { width: 25, align: 'right' });
+      doc.text(`Rs.${rate}`, xRate, y, { width: 40, align: 'right' });
+      doc.text(`Rs.${amount}`, xAmt, y, { width: 48, align: 'right' });
 
-      // Print remaining item name lines
       for (let i = 1; i < nameLines.length; i++) {
-        doc.text('', colSNo); // blank for spacing
-        doc.text(nameLines[i], colItem, doc.y);
+        doc.text('', xSno);
+        doc.text(nameLines[i], xItem);
       }
 
       totalQty += parseInt(qty, 10) || 0;
@@ -619,18 +619,23 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       totalDiscount += parseAmount(sale.discount);
     });
 
+    // Final Summary
     const grandTotal = totalAmount - totalDiscount;
 
-    // Totals
     doc.moveDown(0.5);
     doc.font('Courier-Bold');
-    doc.text('----------------------------------------');
-    doc.text(`Total Qty    : ${totalQty}`, colItem);
-    doc.text(`Total Amount : Rs.${totalAmount.toFixed(2)}`, colItem);
-    doc.text(`Discount     : Rs.${totalDiscount.toFixed(2)}`, colItem);
-    doc.text(`Grand Total  : Rs.${grandTotal.toFixed(2)}`, colItem);
-    doc.text('========================================');
-    doc.moveDown(0.3);
+    doc.text('-'.repeat(usableWidth));
+    doc.text('', xSno); // padding
+
+    // Summary aligned under correct columns
+    const summaryY = doc.y;
+    doc.text(`${totalQty}`, xQty, summaryY, { width: 25, align: 'right' });
+    doc.text(`Rs.${totalAmount.toFixed(2)}`, xAmt, summaryY, { width: 48, align: 'right' });
+
+    doc.text(`Discount     : Rs.${totalDiscount.toFixed(2)}`, xItem);
+    doc.text(`Grand Total  : Rs.${grandTotal.toFixed(2)}`, xItem);
+
+    doc.text('='.repeat(usableWidth));
     doc.fontSize(9).text('Thank you for your purchase!', { align: 'center' });
     doc.text('Visit Again', { align: 'center' });
 
