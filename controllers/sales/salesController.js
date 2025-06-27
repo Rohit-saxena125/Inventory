@@ -529,16 +529,15 @@ function parseAmount(val) {
   }
   return 0;
 }
-
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
     const baseHeight = 500;
-    const lineHeight = 30;
+    const lineHeight = 20;
     let estimatedLines = invoiceDataArray.length;
 
     invoiceDataArray.forEach(sale => {
       const itemName = sale.itemId.itemName;
-      estimatedLines += Math.max(0, Math.ceil(itemName.length / 12) - 1);
+      estimatedLines += Math.max(0, Math.ceil(itemName.length / 18) - 1);
     });
 
     const doc = new PDFDocument({
@@ -560,46 +559,64 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit',
     });
 
-    // Header
+    // HEADER
     doc
-      .fontSize(12)
-      .font('Courier-Bold')
-      .text('', { align: 'center' })
       .fontSize(9)
-      .text('------------------------------------')
+      .font('Courier-Bold')
+      .text('----------------------------------------')
       .font('Courier')
-      .text(`Customer   : ${firstSale.customerName}`)
+      .text(`Customer   : ${firstSale.customerName || 'N/A'}`)
       .text(`Invoice No : ${firstSale.invoiceNumber}`)
       .text(`Date       : ${formattedDate}`)
-      .text('-------------------------------------')
-      .font('Courier-Bold')
-      .text('S.No Item       Qty  Rate     Amt')
-      .font('Courier');
+      .text('----------------------------------------');
 
+    // COLUMN HEADERS
+    const startX = 10;
+    let currentY = doc.y;
+
+    doc
+      .font('Courier-Bold')
+      .text('S.No', startX, currentY)
+      .text('Item Name', startX + 30, currentY)
+      .text('Qty', startX + 140, currentY)
+      .text('Rate', startX + 170, currentY)
+      .text('Amt', startX + 210, currentY);
+
+    doc.moveDown(0.5);
+    doc.font('Courier').fontSize(8);
+
+    // DATA VARIABLES
     let totalQty = 0;
     let totalAmount = 0;
     let totalDiscount = 0;
 
+    // LOOP OVER ITEMS
     invoiceDataArray.forEach((sale, index) => {
-      const sno = (index + 1).toString().padEnd(4);
       const itemName = sale.itemId.itemName;
+      const nameLines = [];
+
+      for (let i = 0; i < itemName.length; i += 18) {
+        nameLines.push(itemName.substring(i, i + 18));
+      }
+
       const qty = sale.quantity.toString();
       const rate = `Rs.${parseFloat(sale.pricePerUnit).toFixed(2)}`;
       const amount = parseAmount(sale.totalAmount).toFixed(2);
 
-      const nameLines = [];
-      for (let i = 0; i < itemName.length; i += 12) {
-        nameLines.push(itemName.substring(i, i + 12));
-      }
+      currentY = doc.y;
 
-      // First line with all data
-      doc.text(
-        `${sno}${nameLines[0].padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs.${amount}`
-      );
+      // First line with all details
+      doc.text(`${index + 1}`, startX, currentY);
+      doc.text(nameLines[0], startX + 30, currentY);
+      doc.text(qty, startX + 140, currentY);
+      doc.text(rate, startX + 170, currentY);
+      doc.text(`Rs.${amount}`, startX + 210, currentY);
 
-      // Additional lines for long item name
+      // Remaining lines of item name
       for (let i = 1; i < nameLines.length; i++) {
-        doc.text(`     ${nameLines[i]}`);
+        currentY = doc.y;
+        doc.text('', startX, currentY);
+        doc.text(nameLines[i], startX + 30, currentY);
       }
 
       totalQty += parseInt(qty, 10) || 0;
@@ -607,15 +624,19 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       totalDiscount += parseAmount(sale.discount);
     });
 
-    // Totals Row: directly under Qty and Amount columns
+    // FOOTER TOTALS
+    const grandTotal = totalAmount - totalDiscount;
+
     doc
-      .text('----------------------------------------')
+      .moveDown(0.5)
       .font('Courier-Bold')
-      .text(`     Total            ${totalQty.toString().padEnd(9)} Rs.${totalAmount.toFixed(2)}`)
-      .text(`     Discount                          Rs.${totalDiscount.toFixed(2)}`)
-      .text(`     Grand Total                      Rs.${(totalAmount - totalDiscount).toFixed(2)}`)
-      .text('=========================================')
-      .fontSize(10)
+      .text('----------------------------------------')
+      .text(`Total Qty: ${totalQty}`, startX + 30)
+      .text(`Total Amount: Rs.${totalAmount.toFixed(2)}`, startX + 140)
+      .text(`Discount:     Rs.${totalDiscount.toFixed(2)}`, startX + 140)
+      .text(`Grand Total:  Rs.${grandTotal.toFixed(2)}`, startX + 140)
+      .text('========================================')
+      .fontSize(9)
       .text('Thank you for your purchase!', { align: 'center' })
       .text('Visit Again', { align: 'center' });
 
@@ -626,9 +647,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
   });
 }
 
-function parseAmount(val) {
-  return parseFloat(val) || 0;
-}
 
 exports.downloadSalesReport = async (req, res) => {
   try {
