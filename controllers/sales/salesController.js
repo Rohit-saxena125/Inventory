@@ -529,15 +529,17 @@ function parseAmount(val) {
   }
   return 0;
 }
+
+
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
+    const lineHeight = 18;
     const baseHeight = 500;
-    const lineHeight = 20;
-    let estimatedLines = invoiceDataArray.length;
+    let estimatedLines = 0;
 
     invoiceDataArray.forEach(sale => {
-      const itemName = sale.itemId.itemName;
-      estimatedLines += Math.max(0, Math.ceil(itemName.length / 18) - 1);
+      const nameLength = sale.itemId.itemName.length;
+      estimatedLines += Math.ceil(nameLength / 24); // 24 chars max per line
     });
 
     const doc = new PDFDocument({
@@ -549,7 +551,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     doc.pipe(stream);
 
     const firstSale = invoiceDataArray[0];
-
     const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -559,64 +560,58 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit',
     });
 
-    // HEADER
-    doc
-      .fontSize(9)
-      .font('Courier-Bold')
-      .text('----------------------------------------')
-      .font('Courier')
-      .text(`Customer   : ${firstSale.customerName || 'N/A'}`)
-      .text(`Invoice No : ${firstSale.invoiceNumber}`)
-      .text(`Date       : ${formattedDate}`)
-      .text('----------------------------------------');
+    // Header
+    doc.font('Courier-Bold').fontSize(9);
+    doc.text('----------------------------------------');
+    doc.font('Courier');
+    doc.text(`Customer   : ${firstSale.customerName || 'N/A'}`);
+    doc.text(`Invoice No : ${firstSale.invoiceNumber}`);
+    doc.text(`Date       : ${formattedDate}`);
+    doc.text('----------------------------------------');
 
-    // COLUMN HEADERS
-    const startX = 10;
-    let currentY = doc.y;
+    // Table headers
+    const colSNo = 10;
+    const colItem = 35;
+    const colQty = 160;
+    const colRate = 190;
+    const colAmt = 230;
 
-    doc
-      .font('Courier-Bold')
-      .text('S.No', startX, currentY)
-      .text('Item Name', startX + 30, currentY)
-      .text('Qty', startX + 140, currentY)
-      .text('Rate', startX + 170, currentY)
-      .text('Amt', startX + 210, currentY);
-
-    doc.moveDown(0.5);
+    doc.font('Courier-Bold');
+    doc.text('S.No', colSNo, doc.y);
+    doc.text('Item Name', colItem, doc.y);
+    doc.text('Qty', colQty, doc.y);
+    doc.text('Rate', colRate, doc.y);
+    doc.text('Amt', colAmt, doc.y);
+    doc.moveDown(0.2);
     doc.font('Courier').fontSize(8);
 
-    // DATA VARIABLES
     let totalQty = 0;
     let totalAmount = 0;
     let totalDiscount = 0;
 
-    // LOOP OVER ITEMS
     invoiceDataArray.forEach((sale, index) => {
       const itemName = sale.itemId.itemName;
+      const qty = sale.quantity.toString();
+      const rate = parseFloat(sale.pricePerUnit).toFixed(2);
+      const amount = parseAmount(sale.totalAmount).toFixed(2);
       const nameLines = [];
 
-      for (let i = 0; i < itemName.length; i += 18) {
-        nameLines.push(itemName.substring(i, i + 18));
+      for (let i = 0; i < itemName.length; i += 24) {
+        nameLines.push(itemName.substring(i, i + 24));
       }
 
-      const qty = sale.quantity.toString();
-      const rate = `Rs.${parseFloat(sale.pricePerUnit).toFixed(2)}`;
-      const amount = parseAmount(sale.totalAmount).toFixed(2);
+      // Print first line with all columns
+      const y = doc.y;
+      doc.text(`${index + 1}`, colSNo, y);
+      doc.text(nameLines[0], colItem, y);
+      doc.text(qty, colQty, y, { width: 25, align: 'right' });
+      doc.text(`Rs.${rate}`, colRate, y, { width: 35, align: 'right' });
+      doc.text(`Rs.${amount}`, colAmt, y, { width: 45, align: 'right' });
 
-      currentY = doc.y;
-
-      // First line with all details
-      doc.text(`${index + 1}`, startX, currentY);
-      doc.text(nameLines[0], startX + 30, currentY);
-      doc.text(qty, startX + 140, currentY);
-      doc.text(rate, startX + 170, currentY);
-      doc.text(`Rs.${amount}`, startX + 210, currentY);
-
-      // Remaining lines of item name
+      // Print remaining item name lines
       for (let i = 1; i < nameLines.length; i++) {
-        currentY = doc.y;
-        doc.text('', startX, currentY);
-        doc.text(nameLines[i], startX + 30, currentY);
+        doc.text('', colSNo); // blank for spacing
+        doc.text(nameLines[i], colItem, doc.y);
       }
 
       totalQty += parseInt(qty, 10) || 0;
@@ -624,21 +619,20 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       totalDiscount += parseAmount(sale.discount);
     });
 
-    // FOOTER TOTALS
     const grandTotal = totalAmount - totalDiscount;
 
-    doc
-      .moveDown(0.5)
-      .font('Courier-Bold')
-      .text('----------------------------------------')
-      .text(`Total Qty: ${totalQty}`, startX + 30)
-      .text(`Total Amount: Rs.${totalAmount.toFixed(2)}`, startX + 140)
-      .text(`Discount:     Rs.${totalDiscount.toFixed(2)}`, startX + 140)
-      .text(`Grand Total:  Rs.${grandTotal.toFixed(2)}`, startX + 140)
-      .text('========================================')
-      .fontSize(9)
-      .text('Thank you for your purchase!', { align: 'center' })
-      .text('Visit Again', { align: 'center' });
+    // Totals
+    doc.moveDown(0.5);
+    doc.font('Courier-Bold');
+    doc.text('----------------------------------------');
+    doc.text(`Total Qty    : ${totalQty}`, colItem);
+    doc.text(`Total Amount : Rs.${totalAmount.toFixed(2)}`, colItem);
+    doc.text(`Discount     : Rs.${totalDiscount.toFixed(2)}`, colItem);
+    doc.text(`Grand Total  : Rs.${grandTotal.toFixed(2)}`, colItem);
+    doc.text('========================================');
+    doc.moveDown(0.3);
+    doc.fontSize(9).text('Thank you for your purchase!', { align: 'center' });
+    doc.text('Visit Again', { align: 'center' });
 
     doc.end();
 
@@ -646,6 +640,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
+
 
 
 exports.downloadSalesReport = async (req, res) => {
