@@ -789,18 +789,18 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     // Table Header
     doc
       .font('Helvetica-Bold')
-      .text('SN  Item Name            Qty  Rate    Amount', { align: 'left' })
+      .text('SN  Item Name            Qty  Unit Rate    Amount', { align: 'left' })
       .font('Helvetica')
       .text('--------------------------------');
 
     // Table Columns Configuration
     const columns = [
-      { name: 'SN', width: 5, align: 'left' },
-      { name: 'Item', width: 25, align: 'left' },
-      { name: 'Qty', width: 5, align: 'right' },
-      {name: 'Unit', width: 5, align: 'right'},
-      { name: 'Rate', width: 10, align: 'right' },
-      { name: 'Amount', width: 10, align: 'right' }
+      { name: 'SN', width: 3, align: 'left' },
+      { name: 'Item', width: 20, align: 'left' },
+      { name: 'Qty', width: 3, align: 'right' },
+      {name: 'Unit', width: 4, align: 'right'},
+      { name: 'Rate', width: 12, align: 'right' },
+      { name: 'Amount', width: 14, align: 'right' }
     ];
 
     let totalAmount = 0;
@@ -813,7 +813,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         sn: String(index + 1),
         item: String(sale.itemId.itemName || ''),
         qty: String(sale.quantity || 0),
-        unit: String(sale.itemId.units || ''),
+        // convert units to string and limit length
+        unit: String(sale.itemId.units || '').substring(0, 5),
         rate: `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
         amount: `Rs.${parseAmount(sale.totalAmount || 0).toFixed(2)}`
       };
@@ -871,12 +872,10 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .text('--------------------------------')
       .text(`Total:`.padEnd(40) + `Rs. ${totalAmount.toFixed(2)-totalDiscount.toFixed()}`, { align: 'left' })
       .text('===============================')
-      .text('Thank you for dining with us!', { align: 'center' })
+      .text('Thank you!', { align: 'center' })
       .text('Visit us again!', { align: 'center' })
       .fontSize(6)
       .moveDown()
-      .text('GSTIN: 22ABCDE1234F1Z5', { align: 'center' })
-      .text('FSSAI No: 12345678901234', { align: 'center' });
 
     doc.end();
 
