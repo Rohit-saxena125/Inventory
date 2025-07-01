@@ -746,18 +746,27 @@ exports.downloadSalesReport = async (req, res) => {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Calculate dynamic height
-    const baseHeight = 500;
-    const lineHeight = 30;
-    let estimatedLines = invoiceDataArray.length + 10; // Base lines + buffer
+    // Constants for layout
+    const PAGE_WIDTH = 288; // 80mm in points
+    const LEFT_MARGIN = 10;
+    const RIGHT_MARGIN = 10;
+    const CONTENT_WIDTH = PAGE_WIDTH - LEFT_MARGIN - RIGHT_MARGIN;
+    const LINE_HEIGHT = 20;
+    const BASE_HEIGHT = 500;
     
+    // Calculate dynamic height
+    let estimatedLines = 15; // Base lines for header/footer
+    
+    // Pre-calculate lines needed
     invoiceDataArray.forEach(sale => {
-      estimatedLines += Math.max(0, Math.ceil(String(sale.itemId.itemName).length / 25) - 1);
+      const itemName = String(sale.itemId.itemName || '');
+      // Estimate lines needed for this item (max 20 chars per line)
+      estimatedLines += Math.max(1, Math.ceil(itemName.length / 20));
     });
 
     const doc = new PDFDocument({
-      size: [288, baseHeight + estimatedLines * lineHeight],
-      margins: { top: 10, bottom: 10, left: 5, right: 5 } // Tighter margins for more space
+      size: [PAGE_WIDTH, BASE_HEIGHT + estimatedLines * LINE_HEIGHT],
+      margins: { top: 10, bottom: 10, left: LEFT_MARGIN, right: RIGHT_MARGIN }
     });
 
     const stream = fs.createWriteStream(outputPath);
@@ -773,61 +782,61 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit'
     });
 
-    // Convert all values to strings
-    const invoiceNumber = String(firstSale.invoiceNumber || '');
-    const customerName = String(firstSale.customerName || '').substring(0, 25); // Limit customer name length
-
+    
     // Invoice Info
     doc
-      .font('Helvetica')
-      .text(`Invoice: ${invoiceNumber.padEnd(10)} Date: ${formattedDate.split(',')[0]}`)
-      .text(`Customer: ${customerName}`)
+      .fontSize(9)
+      .text(`Invoice: ${String(firstSale.invoiceNumber || '').padEnd(8)} Date: ${formattedDate.split(',')[0]}`)
+      .text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`)
       .text(`Time: ${formattedDate.split(',')[1].trim()}`)
       .text('--------------------------------')
       .moveDown();
 
-    // Table Header
-    doc
-      .font('Helvetica-Bold')
-      .text('SN  Item Name            Qty  Unit Rate    Amount', { align: 'left' })
-      .font('Helvetica')
-      .text('--------------------------------');
-
-    // Table Columns Configuration
+    // Table Configuration
     const columns = [
-      { name: 'SN', width: 3, align: 'left' },
-      { name: 'Item', width: 15, align: 'left' },
-      { name: 'Qty', width: 5, align: 'right' },
-      {name: 'Unit', width: 5, align: 'right'},
+      { name: 'SN', width: 5, align: 'left' },
+      { name: 'Item Name', width: 25, align: 'left' },
+      { name: 'Qty', width: 8, align: 'right' },
+      { name: 'Unit', width: 8, align: 'right' },
       { name: 'Rate', width: 15, align: 'right' },
       { name: 'Amount', width: 15, align: 'right' }
     ];
+
+    // Draw table header
+    let headerText = '';
+    columns.forEach(col => {
+      headerText += col.name.padEnd(col.width).substring(0, col.width);
+    });
+    doc
+      .font('Helvetica-Bold')
+      .text(headerText)
+      .font('Helvetica')
+      .text('-'.repeat(CONTENT_WIDTH));
 
     let totalAmount = 0;
     let totalQty = 0;
     let totalDiscount = 0;
 
-    // Draw table rows
+    // Draw table rows with dynamic line breaks
     invoiceDataArray.forEach((sale, index) => {
       const row = {
         sn: String(index + 1),
         item: String(sale.itemId.itemName || ''),
         qty: String(sale.quantity || 0),
-        // convert units to string and limit length short abbreviation
-        unit: String(sale.itemId.units || '').substring(0, 5).toUpperCase(),
+        unit: String(sale.itemId.units || 'pc').substring(0, 5).toUpperCase(),
         rate: `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
         amount: `Rs.${parseAmount(sale.totalAmount || 0).toFixed(2)}`
       };
 
-      // Split long item names into multiple lines
+      // Split item name into multiple lines if needed
       const itemLines = [];
-      let remainingItem = row.item;
-      while (remainingItem.length > 0) {
-        itemLines.push(remainingItem.substring(0, 25));
-        remainingItem = remainingItem.substring(25);
+      let remainingName = row.item;
+      while (remainingName.length > 0) {
+        itemLines.push(remainingName.substring(0, 20));
+        remainingName = remainingName.substring(20);
       }
 
-      // Print each line of the row
+      // Print each line
       itemLines.forEach((line, lineIndex) => {
         let rowText = '';
         
@@ -836,9 +845,9 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
           rowText += row.sn.padEnd(columns[0].width);
           rowText += line.padEnd(columns[1].width);
           rowText += row.qty.padStart(columns[2].width);
-          rowText += row.unit.padStart(columns[2].width);
-          rowText += row.rate.padStart(columns[3].width);
-          rowText += row.amount.padStart(columns[4].width);
+          rowText += row.unit.padStart(columns[3].width);
+          rowText += row.rate.padStart(columns[4].width);
+          rowText += row.amount.padStart(columns[5].width);
         } else {
           // Subsequent lines only show item name continuation
           rowText += ' '.repeat(columns[0].width);
@@ -848,34 +857,37 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         doc.text(rowText);
       });
 
+      // Add separator if item name spanned multiple lines
+      if (itemLines.length > 1) {
+        doc.moveDown(-0.5); // Reduce space between wrapped lines
+      }
+
       totalQty += parseInt(row.qty) || 0;
       totalAmount += parseAmount(sale.totalAmount || 0);
       totalDiscount += parseAmount(sale.discount || 0);
     });
 
-    // Calculate taxes (example: 5% GST)
-    const taxableAmount = totalAmount / 1.05;
-    const taxAmount = totalAmount - taxableAmount;
-
     // Footer with totals
     doc
-      .text('--------------------------------')
+      .moveDown()
+      .text('-'.repeat(CONTENT_WIDTH))
       .font('Helvetica-Bold')
-      .text(`Total Quantity:`.padEnd(40) + `${totalQty}`, { align: 'left' })
-      .text(`Sub Total:`.padEnd(40) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
+      .text(`Total Quantity:`.padEnd(30) + `${totalQty}`, { align: 'left' })
+      .text(`Sub Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
     
     if (totalDiscount > 0) {
-      doc.text(`Discount:`.padEnd(40) + `Rs. ${totalDiscount.toFixed(2)}`, { align: 'left' });
+      doc.text(`Discount:`.padEnd(30) + `Rs. ${totalDiscount.toFixed(2)}`, { align: 'left' });
     }
     
     doc
-      .text('--------------------------------')
-      .text(`Total:`.padEnd(40) + `Rs. ${totalAmount.toFixed(2)-totalDiscount.toFixed()}`, { align: 'left' })
-      .text('===============================')
+      .text('-'.repeat(CONTENT_WIDTH))
+      .text(`Total:`.padEnd(30) + `Rs. ${(totalAmount - totalDiscount).toFixed(2)}`, { align: 'left' })
+      .text('='.repeat(CONTENT_WIDTH))
+      .moveDown()
+      .fontSize(10)
       .text('Thank you!', { align: 'center' })
       .text('Visit us again!', { align: 'center' })
       .fontSize(6)
-      .moveDown()
 
     doc.end();
 
