@@ -531,170 +531,182 @@ function parseAmount(val) {
   }
   return 0;
 }
+function createInvoice(invoice, path) {
+    let doc = new PDFDocument({ size: 'A4', margin: 50 });
 
-function formatItemName(name, maxWidth) {
-  if (name.length <= maxWidth) {
-    return name;
-  }
-  const parts = [];
-  let currentLine = '';
-  const words = name.split(' ');
-
-  for (const word of words) {
-    if ((currentLine + ' ' + word).trim().length > maxWidth) {
-      parts.push(currentLine.trim());
-      currentLine = word;
-    } else {
-      currentLine = (currentLine + ' ' + word).trim();
-    }
-  }
-  if (currentLine) {
-    parts.push(currentLine);
-  }
-  return parts.join('\n');
-}
-
-
-async function createInvoicePDF(invoiceDataArray, outputPath) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: [226, 800], // 80mm width
-      margins: { top: 10, bottom: 10, left: 10, right: 10 },
-    });
-
-    const stream = fs.createWriteStream(outputPath);
-    doc.pipe(stream);
-
-    const firstSale = invoiceDataArray[0];
-    
-    const saleDate = new Date(firstSale.saleDate);
-    const formattedDate = saleDate.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }).replace(',', '').toLowerCase(); // "01 jul 2025 4:59 pm"
-
-    // --- Header ---
-    doc
-      .font('Courier-Bold')
-      .fontSize(12)
-      .text('Your Store Name', { align: 'center' })
-      .font('Courier')
-      .fontSize(8)
-      .text('123 Main Street, Anytown', { align: 'center' })
-      .moveDown(1);
-
-    // --- Customer + Invoice Info ---
-    doc
-      .fontSize(9)
-      .text(`Customer: ${firstSale.customerName || ''}`)
-      .text(`Invoice No: ${firstSale.invoiceNumber}`)
-      .text(`Date: ${formattedDate}`)
-      .moveDown(1);
-      
-    // --- Column Definitions ---
-    const tableTop = doc.y;
-    const snoCol = 10;
-    const itemCol = 35;
-    const qtyCol = 125;
-    const unitCol = 155;
-    const rateCol = 190;
-    const amtCol = 220;
-    
-    const rightEdge = doc.page.width - doc.page.margins.right;
-
-    // --- Table Header ---
-    doc.font('Courier-Bold');
-    drawTableRow(doc, tableTop, "SNo", "Item", "Qty", "Uni", "Rate", "Amt", snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol);
-    
-    // Underline for header
-    const lineY = doc.y;
-    doc.moveTo(snoCol, lineY).lineTo(rightEdge, lineY).stroke();
-    doc.moveDown(0.5);
-
-    // --- Items Loop ---
-    let totalAmount = 0;
-    let totalQty = 0;
-
-    doc.font('Courier');
-    invoiceDataArray.forEach((sale, index) => {
-      const sno = (index + 1).toString();
-      // Format item name to split into lines if needed
-      const itemName = formatItemName(sale.itemId.itemName, 14); // Max 14 chars per line
-      const unit = sale.itemId.unit || 'pcs';
-      const qty = sale.quantity.toString();
-      const rate = parseFloat(sale.pricePerUnit).toFixed(2);
-      const amount = (sale.quantity * sale.pricePerUnit).toFixed(2);
-
-      totalQty += parseInt(qty, 10) || 0;
-      totalAmount += parseFloat(amount);
-
-      drawTableRow(doc, doc.y, sno, itemName, qty, unit, rate, amount, snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol);
-    });
-    
-    // --- Final Separator line ---
-    const finalY = doc.y;
-    doc.moveTo(snoCol, finalY).lineTo(rightEdge, finalY).stroke();
-    doc.moveDown(1.5);
-
-    // --- Totals Section (matches image layout) ---
-    doc.font('Courier-Bold').fontSize(10);
-    const totalsLabelX = 100; // X position for labels
-    const pageEndX = doc.page.width - doc.page.margins.right;
-
-    // Total Qty
-    doc.text('Total Qty:', totalsLabelX, doc.y, { align: 'left'});
-    doc.text(totalQty.toString(), 0, doc.y - doc.currentLineHeight(), { align: 'right' });
-
-    // Subtotal
-    doc.text('Subtotal: Rs.', totalsLabelX, doc.y, { align: 'left'});
-    doc.text(totalAmount.toFixed(2), 0, doc.y - doc.currentLineHeight(), { align: 'right' });
-    
-    // Grand Total
-    doc.text('Grand Total: Rs.', totalsLabelX, doc.y, { align: 'left'});
-    doc.text(totalAmount.toFixed(2), 0, doc.y - doc.currentLineHeight(), { align: 'right' });
-    
-    doc.moveDown(2);
-
-    // --- Footer ---
-    doc
-      .font('Courier')
-      .fontSize(9)
-      .text('Thank you for\nyour purchase!', { align: 'center', lineGap: 2 })
-      .moveDown(0.5)
-      .text('Visit Again', { align: 'center' });
+    generateHeader(doc, invoice);
+    generateCustomerInformation(doc, invoice);
+    generateInvoiceTable(doc, invoice);
+    generateFooter(doc);
 
     doc.end();
-
-    stream.on('finish', () => resolve(outputPath));
-    stream.on('error', reject);
-  });
+    doc.pipe(fs.createWriteStream(path));
+    console.log(`Invoice PDF created successfully at: ${path}`);
 }
 
-// Universal row drawer for header and data rows
-function drawTableRow(doc, y, sno, item, qty, unit, rate, amt, snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol) {
-  const itemWidth = qtyCol - itemCol - 5;
-  const initialY = y;
-  
-  // The item text is drawn first, as it's the only one that can wrap.
-  // The `item` string may contain '\n' for manual line breaks.
-  doc.text(item, itemCol, initialY, { width: itemWidth });
-  
-  // We calculate the height of the item block to correctly position the next row.
-  const itemHeight = doc.heightOfString(item, { width: itemWidth });
+function generateHeader(doc, invoice) {
+    // Replace 'logo.png' with your own logo file
+    // If you don't have a logo, you can comment this out.
+    try {
+        if (fs.existsSync('logo.png')) {
+            doc.image('logo.png', 50, 45, { width: 50 });
+        } else {
+            console.warn("logo.png not found. Skipping logo.");
+        }
+    } catch (error) {
+        console.error("Error loading logo:", error);
+    }
+    
+    doc
+        .fillColor('#444444')
+        .fontSize(20)
+        .text(invoice.company.name, 110, 57)
+        .fontSize(10)
+        .text(invoice.company.address, 200, 65, { align: 'right' })
+        .text(invoice.company.cityStateZip, 200, 80, { align: 'right' })
+        .moveDown();
+}
 
-  // Draw other columns, vertically aligned with the top of the row.
-  doc.text(sno, snoCol, initialY);
-  doc.text(qty, qtyCol, initialY, { width: 20, align: 'right' });
-  doc.text(unit, unitCol, initialY, { width: 20, align: 'right' });
-  doc.text(rate, rateCol, initialY, { width: 30, align: 'right' });
-  doc.text(amt, amtCol, initialY, { width: 35, align: 'right' });
+function generateCustomerInformation(doc, invoice) {
+    doc.fillColor('#444444').fontSize(20).text('Invoice', 50, 160);
 
-  // Set the new Y position after the tallest element (the item name) plus a small margin.
-  doc.y = initialY + itemHeight + 4;
+    generateHr(doc, 185);
+
+    const customerInformationTop = 200;
+
+    doc
+        .fontSize(10)
+        .text('Invoice Number:', 50, customerInformationTop)
+        .font('Helvetica-Bold')
+        .text(invoice.invoice_nr, 150, customerInformationTop)
+        .font('Helvetica')
+        .text('Invoice Date:', 50, customerInformationTop + 15)
+        .text(formatDate(new Date()), 150, customerInformationTop + 15)
+        .text('Balance Due:', 50, customerInformationTop + 30)
+        .text(
+            formatCurrency(invoice.subtotal - invoice.paid),
+            150,
+            customerInformationTop + 30
+        )
+
+        .font('Helvetica-Bold')
+        .text(invoice.shipping.name, 300, customerInformationTop)
+        .font('Helvetica')
+        .text(invoice.shipping.address, 300, customerInformationTop + 15)
+        .text(
+            `${invoice.shipping.city}, ${invoice.shipping.state} ${invoice.shipping.postal_code}`,
+            300,
+            customerInformationTop + 30
+        )
+        .moveDown();
+
+    generateHr(doc, 252);
+}
+
+function generateInvoiceTable(doc, invoice) {
+    let i;
+    const invoiceTableTop = 330;
+
+    doc.font('Helvetica-Bold');
+    generateTableRow(
+        doc,
+        invoiceTableTop,
+        'Item',
+        'Unit Cost',
+        'Quantity',
+        'Line Total'
+    );
+    generateHr(doc, invoiceTableTop + 20);
+    doc.font('Helvetica');
+
+    for (i = 0; i < invoice.items.length; i++) {
+        const item = invoice.items[i];
+        const position = invoiceTableTop + (i + 1) * 30;
+        generateTableRow(
+            doc,
+            position,
+            item.item,
+            formatCurrency(item.price),
+            item.quantity,
+            formatCurrency(item.price * item.quantity)
+        );
+
+        generateHr(doc, position + 20);
+    }
+
+    const subtotalPosition = invoiceTableTop + (i + 1) * 30;
+    generateTableRow(
+        doc,
+        subtotalPosition,
+        '',
+        '',
+        'Subtotal',
+        formatCurrency(invoice.subtotal)
+    );
+
+    const paidToDatePosition = subtotalPosition + 20;
+    generateTableRow(
+        doc,
+        paidToDatePosition,
+        '',
+        '',
+        'Paid To Date',
+        formatCurrency(invoice.paid)
+    );
+
+    const duePosition = paidToDatePosition + 25;
+    doc.font('Helvetica-Bold');
+    generateTableRow(
+        doc,
+        duePosition,
+        '',
+        '',
+        'Balance Due',
+        formatCurrency(invoice.subtotal - invoice.paid)
+    );
+    doc.font('Helvetica');
+}
+
+function generateFooter(doc) {
+    doc
+        .fontSize(10)
+        .text(
+            'Payment is due within 15 days. Thank you for your business.',
+            50,
+            780,
+            { align: 'center', width: 500 }
+        );
+}
+
+// Helper functions for formatting and drawing
+function generateTableRow(doc, y, item, unitCost, quantity, lineTotal) {
+    doc
+        .fontSize(10)
+        .text(item, 50, y)
+        .text(unitCost, 280, y, { width: 90, align: 'right' })
+        .text(quantity, 370, y, { width: 90, align: 'right' })
+        .text(lineTotal, 0, y, { align: 'right' });
+}
+
+function generateHr(doc, y) {
+    doc
+        .strokeColor('#aaaaaa')
+        .lineWidth(1)
+        .moveTo(50, y)
+        .lineTo(550, y)
+        .stroke();
+}
+
+function formatCurrency(cents) {
+    return 'Rs. ' + (cents / 100).toFixed(2);
+}
+
+function formatDate(date) {
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+
+    return year + '/' + month + '/' + day;
 }
 
 exports.downloadSalesReport = async (req, res) => {
