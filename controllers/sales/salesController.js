@@ -881,129 +881,149 @@ exports.downloadSalesReport = async (req, res) => {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Calculate dynamic height based on items
+    // Calculate dynamic height
     const baseHeight = 500;
     const lineHeight = 30;
-    let estimatedLines = invoiceDataArray.length;
+    let estimatedLines = invoiceDataArray.length + 10; // Base lines + buffer
     
-    // Pre-calculate lines needed for item names
     invoiceDataArray.forEach(sale => {
-      const itemName = String(sale.itemId.itemName || '');
-      estimatedLines += Math.max(0, Math.ceil(itemName.length / 25) - 1);
+      estimatedLines += Math.max(0, Math.ceil(String(sale.itemId.itemName).length / 25) - 1);
     });
 
     const doc = new PDFDocument({
       size: [288, baseHeight + estimatedLines * lineHeight],
-      margins: { top: 10, bottom: 10, left: 10, right: 10 },
+      margins: { top: 10, bottom: 10, left: 5, right: 5 } // Tighter margins for more space
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
     const firstSale = invoiceDataArray[0];
-
     const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
       month: 'short',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit',
+      minute: '2-digit'
     });
 
-    // Convert all values to strings explicitly
+    // Convert all values to strings
     const invoiceNumber = String(firstSale.invoiceNumber || '');
-    const customerName = String(firstSale.customerName || '');
-    const datePart = formattedDate.split(',')[0] || '';
-    const timePart = formattedDate.split(',')[1] ? formattedDate.split(',')[1].trim() : '';
+    const customerName = String(firstSale.customerName || '').substring(0, 25); // Limit customer name length
 
-    // HEADER
+    // Restaurant Header
     doc
       .fontSize(14)
-      .font('Courier-Bold')
+      .font('Helvetica-Bold')
+      .text('RESTAURANT NAME', { align: 'center' })
+      .fontSize(9)
+      .font('Helvetica')
+      .text('123 Main Street, City', { align: 'center' })
+      .text('Phone: +91 9876543210', { align: 'center' })
       .moveDown()
-      .text('------------------------------------', { align: 'center' });
+      .text('--------------------------------', { align: 'center' });
 
     // Invoice Info
     doc
-      .font('Courier')
-      .text(`Invoice #: ${invoiceNumber.padEnd(15)} Date: ${datePart}`)
-      .text(`Customer : ${customerName}`)
-      .text(`Time     : ${timePart}`)
-      .text('-------------------------------------');
+      .font('Helvetica')
+      .text(`Invoice: ${invoiceNumber.padEnd(10)} Date: ${formattedDate.split(',')[0]}`)
+      .text(`Customer: ${customerName}`)
+      .text(`Time: ${formattedDate.split(',')[1].trim()}`)
+      .text('--------------------------------')
+      .moveDown();
 
-    // Table Heading
+    // Table Header
     doc
-      .font('Courier-Bold')
-      .text('No  Item Name              Qty  Unit  Rate      Amount')
-      .font('Courier')
-      .text('------------------------------------------------------');
+      .font('Helvetica-Bold')
+      .text('SN  Item Name            Qty  Rate    Amount', { align: 'left' })
+      .font('Helvetica')
+      .text('--------------------------------');
 
-    let totalDiscount = 0;
+    // Table Columns Configuration
+    const columns = [
+      { name: 'SN', width: 5, align: 'left' },
+      { name: 'Item', width: 25, align: 'left' },
+      { name: 'Qty', width: 5, align: 'right' },
+      { name: 'Rate', width: 10, align: 'right' },
+      { name: 'Amount', width: 10, align: 'right' }
+    ];
+
     let totalAmount = 0;
     let totalQty = 0;
-    let taxableAmount = 0;
-    let taxAmount = 0;
+    let totalDiscount = 0;
 
-    // Items Loop with dynamic name handling
+    // Draw table rows
     invoiceDataArray.forEach((sale, index) => {
-      const serialNo = String(index + 1).padEnd(3);
-      const itemName = String(sale.itemId.itemName || '');
-      const qty = String(sale.quantity || '').padEnd(3);
-      const unit = String(sale.itemId.unit || 'pc').padEnd(4);
-      const rate = `Rs. ${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`.padEnd(7);
-      const amount = parseAmount(sale.totalAmount || 0).toFixed(2);
+      const row = {
+        sn: String(index + 1),
+        item: String(sale.itemId.itemName || ''),
+        qty: String(sale.quantity || 0),
+        rate: `Rs. ${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
+        amount: `Rs. ${parseAmount(sale.totalAmount || 0).toFixed(2)}`
+      };
 
-      // Calculate space for item name
-      const maxItemNameWidth = 25;
-      const nameLines = [];
-      let remainingName = itemName;
-      
-      while (remainingName.length > 0) {
-        const line = remainingName.substring(0, maxItemNameWidth);
-        nameLines.push(line);
-        remainingName = remainingName.substring(maxItemNameWidth);
+      // Split long item names into multiple lines
+      const itemLines = [];
+      let remainingItem = row.item;
+      while (remainingItem.length > 0) {
+        itemLines.push(remainingItem.substring(0, 25));
+        remainingItem = remainingItem.substring(25);
       }
 
-      // First line with all details
-      doc.text(
-        `${serialNo} ${nameLines[0].padEnd(maxItemNameWidth)} ${qty} ${unit} ${rate} Rs. ${amount}`
-      );
+      // Print each line of the row
+      itemLines.forEach((line, lineIndex) => {
+        let rowText = '';
+        
+        if (lineIndex === 0) {
+          // First line shows all columns
+          rowText += row.sn.padEnd(columns[0].width);
+          rowText += line.padEnd(columns[1].width);
+          rowText += row.qty.padStart(columns[2].width);
+          rowText += row.rate.padStart(columns[3].width);
+          rowText += row.amount.padStart(columns[4].width);
+        } else {
+          // Subsequent lines only show item name continuation
+          rowText += ' '.repeat(columns[0].width);
+          rowText += line.padEnd(columns[1].width);
+        }
+        
+        doc.text(rowText);
+      });
 
-      // Subsequent lines
-      for (let i = 1; i < nameLines.length; i++) {
-        doc.text(`    ${nameLines[i]}`);
-      }
-
-      const discount = parseAmount(sale.discount || 0);
-      totalQty += parseInt(qty, 10) || 0;
-      totalDiscount += discount;
-      totalAmount += parseFloat(amount);
-      taxAmount += parseFloat(amount) - (parseFloat(amount) / 1.05);
-      taxableAmount += parseFloat(amount) / 1.05;
+      totalQty += parseInt(row.qty) || 0;
+      totalAmount += parseAmount(sale.totalAmount || 0);
+      totalDiscount += parseAmount(sale.discount || 0);
     });
+
+    // Calculate taxes (example: 5% GST)
+    const taxableAmount = totalAmount / 1.05;
+    const taxAmount = totalAmount - taxableAmount;
 
     // Footer with totals
     doc
-      .text('------------------------------------------------------')
-      .font('Courier-Bold')
-      .text(`Sub Total:`.padEnd(45) + `Rs. ${taxableAmount.toFixed(2)}`)
-      
+      .text('--------------------------------')
+      .font('Helvetica-Bold')
+      .text(`Sub Total:`.padEnd(40) + `Rs. ${taxableAmount.toFixed(2)}`, { align: 'left' })
+      .text(`Tax (5%):`.padEnd(40) + `Rs. ${taxAmount.toFixed(2)}`, { align: 'left' });
+    
     if (totalDiscount > 0) {
-      doc.text(`Discount:`.padEnd(45) + `Rs. ${totalDiscount.toFixed(2)}`);
+      doc.text(`Discount:`.padEnd(40) + `Rs. ${totalDiscount.toFixed(2)}`, { align: 'left' });
     }
     
     doc
-      .text('------------------------------------------------------')
-      .text(`Total Amount:`.padEnd(45) + `Rs. ${totalAmount.toFixed(2)}`)
-      .text('======================================================')
+      .text('--------------------------------')
+      .text(`Total:`.padEnd(40) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
+      .text('===============================')
       .fontSize(8)
-      .text(`Total Items: ${totalQty}`, { align: 'left' })
+      .text(`Items: ${totalQty}`, { align: 'left' })
       .moveDown()
-      .text('Thank you !', { align: 'center' })
-      .text('Visit Again', { align: 'center' })
+      .text('Thank you for dining with us!', { align: 'center' })
+      .text('Visit us again!', { align: 'center' })
       .fontSize(6)
       .moveDown()
+      .text('GSTIN: 22ABCDE1234F1Z5', { align: 'center' })
+      .text('FSSAI No: 12345678901234', { align: 'center' });
 
     doc.end();
 
