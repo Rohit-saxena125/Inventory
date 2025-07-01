@@ -805,8 +805,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     doc
       .font('Helvetica-Bold')
       .text(headerText)
-      .font('Helvetica')
-      .text('─'.repeat(CONTENT_WIDTH));
+      .font('Helvetica');
 
     let totalAmount = 0;
     let totalQty = 0;
@@ -860,11 +859,9 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     // Footer Section
     doc
       .moveDown()
-      .text('─'.repeat(CONTENT_WIDTH))
       .font('Helvetica-Bold')
       .text(`Total Quantity:`.padEnd(30) + `${totalQty}`, { align: 'left' })
       .text(`Sub Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
-      .text('─'.repeat(CONTENT_WIDTH))
       .text(`Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
       .text('═'.repeat(CONTENT_WIDTH))
       .moveDown()
