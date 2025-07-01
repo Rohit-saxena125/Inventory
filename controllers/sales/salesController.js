@@ -531,7 +531,7 @@ function parseAmount(val) {
   }
   return 0;
 }
-function createInvoice(invoice, path) {
+function createInvoicePDF(invoice, path) {
     let doc = new PDFDocument({ size: 'A4', margin: 50 });
 
     generateHeader(doc, invoice);
