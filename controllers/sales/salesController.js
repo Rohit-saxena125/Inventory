@@ -796,11 +796,11 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     // Table Columns Configuration
     const columns = [
       { name: 'SN', width: 3, align: 'left' },
-      { name: 'Item', width: 20, align: 'left' },
-      { name: 'Qty', width: 3, align: 'right' },
-      {name: 'Unit', width: 4, align: 'right'},
-      { name: 'Rate', width: 12, align: 'right' },
-      { name: 'Amount', width: 14, align: 'right' }
+      { name: 'Item', width: 15, align: 'left' },
+      { name: 'Qty', width: 5, align: 'right' },
+      {name: 'Unit', width: 5, align: 'right'},
+      { name: 'Rate', width: 15, align: 'right' },
+      { name: 'Amount', width: 15, align: 'right' }
     ];
 
     let totalAmount = 0;
@@ -813,8 +813,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         sn: String(index + 1),
         item: String(sale.itemId.itemName || ''),
         qty: String(sale.quantity || 0),
-        // convert units to string and limit length
-        unit: String(sale.itemId.units || '').substring(0, 5),
+        // convert units to string and limit length short abbreviation
+        unit: String(sale.itemId.units || '').substring(0, 5).toUpperCase(),
         rate: `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
         amount: `Rs.${parseAmount(sale.totalAmount || 0).toFixed(2)}`
       };
