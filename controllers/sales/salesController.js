@@ -476,7 +476,7 @@ exports.fetchSalesReport = async (req, res) => {
     const invoiceMap = new Map();
     sales.forEach((sale) => {
       const invoiceNumber = sale.invoiceNumber;
-      const customerName = sale.customerName || '-';
+      const customerName = sale.customerName || 'N/A';
       const saleCreatedBy = sale.createdBy?._id;
       const key = `${invoiceNumber}-${saleCreatedBy}`;
       const price = parseFloat(sale.pricePerUnit || 0);
@@ -534,27 +534,15 @@ function parseAmount(val) {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Calculate dynamic height based on items (now considering multi-line names)
-    const baseHeight = 500;
-    const lineHeight = 30;
-    let estimatedLines = invoiceDataArray.length;
-    
-    // Pre-calculate how many lines each item name will take
-    invoiceDataArray.forEach(sale => {
-      const itemName = sale.itemId.itemName;
-      estimatedLines += Math.max(0, Math.ceil(itemName.length / 12) - 1);
-    });
-
     const doc = new PDFDocument({
-      size: [288, baseHeight + estimatedLines * lineHeight], // 80mm wide
-      margins: { top: 10, bottom: 10, left: 10, right: 10 },
+      size: [226, 800], 
+      margins: { top: 10, bottom: 10, left: 5, right: 5 },
+      autoFirstPage: true,
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
-
-    const firstSale = invoiceDataArray[0]; // Assuming all sales are from the same invoice
-
+    const firstSale = invoiceDataArray[0];
     const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -564,72 +552,111 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit',
     });
 
-    // HEADER
+    // --- Header ---
     doc
+      .font('Helvetica-Bold') // A more readable font than Courier for small sizes
       .fontSize(12)
-      .font('Courier-Bold')
-      .text('', { align: 'center' })
-      .fontSize(9)
-      .text('------------------------------------');
+      .text('Your Store Name', { align: 'center' })
+      .fontSize(8)
+      .font('Helvetica')
+      .text('123 Main Street, Anytown', { align: 'center' })
+      .moveDown(0.5);
 
-    // Customer + Invoice Info
+    doc.text('------------------------------------------', { align: 'center' });
+
+    // --- Customer + Invoice Info ---
     doc
-      .font('Courier')
-      .text(`Customer   : ${firstSale.customerName}`)
-      .text(`Invoice No : ${firstSale.invoiceNumber}`)
-      .text(`Date       : ${formattedDate}`)
-      .text('-------------------------------------');
+      .fontSize(9)
+      .text(`Customer: ${firstSale.customerName}`)
+      .text(`Invoice No: ${firstSale.invoiceNumber}`)
+      .text(`Date: ${formattedDate}`)
+      .moveDown(1);
 
+    // --- Column definitions ---
+    const tableTop = doc.y;
+    const snoCol = 10;
+    const itemCol = 35;
+    const qtyCol = 125;
+    const unitCol = 150;
+    const rateCol = 175;
+    const amtCol = 200; // Right-aligned
+
+    // --- Table Header ---
+    doc.font('Helvetica-Bold');
+    drawTableRow(
+        doc,
+        tableTop,
+        "SNo", "Item", "Qty", "Unit", "Rate", "Amt",
+        snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol
+    );
+    doc.font('Helvetica');
+    doc.y += 5; // Add some space after header
+    const lineY = doc.y;
+    doc.moveTo(snoCol - 5, lineY).lineTo(amtCol + 20, lineY).stroke();
+    doc.moveDown(0.5);
+
+
+    // --- Items Loop ---
     let totalDiscount = 0;
     let totalAmount = 0;
     let totalQty = 0;
 
-    // Table Heading
-    doc
-      .font('Courier-Bold')
-      .text('Item        Qty       Rate       Amt')
-      .font('Courier');
-
-    // Items Loop
-    invoiceDataArray.forEach((sale) => {
+    invoiceDataArray.forEach((sale, index) => {
+      const sno = (index + 1).toString();
       const itemName = sale.itemId.itemName;
+      // Assuming 'unit' is available at sale.itemId.unit
+      const unit = sale.itemId.unit || 'pcs';
       const qty = sale.quantity.toString();
-      const rate = `Rs. ${parseFloat(sale.pricePerUnit).toFixed(2)}`;
+      const rate = parseFloat(sale.pricePerUnit).toFixed(2);
       const amount = parseAmount(sale.totalAmount).toFixed(2);
-
-      // Split long item names into multiple lines
-      const maxItemNameWidth = 12; // Characters
-      const nameLines = [];
       
-      for (let i = 0; i < itemName.length; i += maxItemNameWidth) {
-        nameLines.push(itemName.substring(i, i + maxItemNameWidth));
-      }
-
-      // First line with all details
-      doc.text(
-        `${nameLines[0].padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs. ${amount}`
-      );
-
-      // Subsequent lines (just the item name continuation)
-      for (let i = 1; i < nameLines.length; i++) {
-        doc.text(nameLines[i]);
-      }
-
       const discount = parseAmount(sale.discount);
       totalQty += parseInt(qty, 10) || 0;
       totalDiscount += discount;
       totalAmount += parseFloat(amount);
-    });
 
+      // --- Draw table row for this item ---
+      drawTableRow(
+          doc,
+          doc.y, // Start at the current Y position
+          sno, itemName, qty, unit, rate, amount,
+          snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol
+      );
+    });
+    
+    // --- Separator line ---
+    const finalY = doc.y;
+    doc.moveTo(snoCol - 5, finalY).lineTo(amtCol + 20, finalY).stroke();
+    doc.moveDown(1);
+
+    // --- Totals Section ---
+    doc.font('Helvetica-Bold');
+    // Using a two-column layout for totals for alignment
+    const totalsX1 = 120;
+    const totalsX2 = 175;
+
+    doc.text('Total Qty:', totalsX1, doc.y, {align: 'left'});
+    doc.text(totalQty.toString(), totalsX2, doc.y - doc.currentLineHeight(), {align: 'right'});
+    
+    doc.text('Subtotal:', totalsX1, doc.y, {align: 'left'});
+    doc.text(`Rs. ${totalAmount.toFixed(2)}`, totalsX2, doc.y - doc.currentLineHeight(), {align: 'right'});
+
+    if(totalDiscount > 0) {
+        doc.text('Discount:', totalsX1, doc.y, {align: 'left'});
+        doc.text(`- Rs. ${totalDiscount.toFixed(2)}`, totalsX2, doc.y - doc.currentLineHeight(), {align: 'right'});
+    }
+
+    const grandTotal = totalAmount - totalDiscount;
+    doc.font('Helvetica-Bold').fontSize(10);
+    doc.text('Grand Total:', totalsX1, doc.y, {align: 'left'});
+    doc.text(`Rs. ${grandTotal.toFixed(2)}`, totalsX2, doc.y - doc.currentLineHeight(), {align: 'right'});
+    
+    doc.moveDown(2);
+
+    // --- Footer ---
     doc
-      .font('Courier')
-      .text('----------------------------------------')
-      .font('Courier-Bold')
-      .text(`Discount   : Rs. ${totalDiscount.toFixed(2)}`)
-      .text(`Total Quantity  : ${totalQty}`)
-      .text(`Total      : Rs. ${totalAmount.toFixed(2)}`)
-      .text('=========================================')
-      .fontSize(10)
+      .font('Helvetica')
+      .fontSize(9)
       .text('Thank you for your purchase!', { align: 'center' })
       .text('Visit Again', { align: 'center' });
 
@@ -639,6 +666,28 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
+
+function drawTableRow(doc, y, sno, item, qty, unit, rate, amt, snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol) {
+  const itemWidth = qtyCol - itemCol - 5; // Width for the item name column
+  const initialY = y;
+
+  // Draw the item name first, as it's the only one that can wrap
+  doc.text(item, itemCol, y, { width: itemWidth });
+  
+  // Calculate the height of the item text block
+  const itemHeight = doc.heightOfString(item, { width: itemWidth });
+
+  // Now draw the other columns, aligned to the top of the row
+  doc.text(sno, snoCol, initialY);
+  doc.text(qty, qtyCol, initialY);
+  doc.text(unit, unitCol, initialY);
+  doc.text(rate, rateCol, initialY, { align: 'right', width: amtCol - rateCol - 5 });
+  doc.text(amt, amtCol, initialY, { align: 'right', width: 20 }); // Amt is right aligned
+
+  // Set the new Y position to be after the tallest element (the item name) + a small margin
+  doc.y = initialY + itemHeight + 5; 
+}
+
 exports.downloadSalesReport = async (req, res) => {
   try {
     const {
