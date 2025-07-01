@@ -532,9 +532,31 @@ function parseAmount(val) {
   return 0;
 }
 
+function formatItemName(name, maxWidth) {
+  if (name.length <= maxWidth) {
+    return name;
+  }
+  const parts = [];
+  let currentLine = '';
+  const words = name.split(' ');
+
+  for (const word of words) {
+    if ((currentLine + ' ' + word).trim().length > maxWidth) {
+      parts.push(currentLine.trim());
+      currentLine = word;
+    } else {
+      currentLine = (currentLine + ' ' + word).trim();
+    }
+  }
+  if (currentLine) {
+    parts.push(currentLine);
+  }
+  return parts.join('\n');
+}
+
+
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Use 80mm width (226.77 points) and a flexible height
     const doc = new PDFDocument({
       size: [226, 800], // 80mm width
       margins: { top: 10, bottom: 10, left: 10, right: 10 },
@@ -543,10 +565,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
-    // --- Invoice static info ---
     const firstSale = invoiceDataArray[0];
     
-    // Format date to match "01 Jul 2025, 10:29 pm"
     const saleDate = new Date(firstSale.saleDate);
     const formattedDate = saleDate.toLocaleString('en-GB', {
         day: '2-digit',
@@ -555,7 +575,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-      }).replace(/, /g, ', ').toLowerCase(); // e.g. "01 Jul 2025, 10:29 pm"
+      }).replace(',', '').toLowerCase(); // "01 jul 2025 4:59 pm"
 
     // --- Header ---
     doc
@@ -565,89 +585,77 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .font('Courier')
       .fontSize(8)
       .text('123 Main Street, Anytown', { align: 'center' })
-      .moveDown(0.5);
+      .moveDown(1);
 
     // --- Customer + Invoice Info ---
     doc
       .fontSize(9)
-      .text(`Customer: ${firstSale.customerName}`)
+      .text(`Customer: ${firstSale.customerName || ''}`)
       .text(`Invoice No: ${firstSale.invoiceNumber}`)
       .text(`Date: ${formattedDate}`)
       .moveDown(1);
       
-    // --- Column definitions for precise alignment ---
+    // --- Column Definitions ---
     const tableTop = doc.y;
     const snoCol = 10;
     const itemCol = 35;
-    const qtyCol = 135;
-    const unitCol = 165;
-    const rateCol = 195;
-    const amtCol = 220; // Page width is ~226, so this is far right
+    const qtyCol = 125;
+    const unitCol = 155;
+    const rateCol = 190;
+    const amtCol = 220;
+    
+    const rightEdge = doc.page.width - doc.page.margins.right;
 
     // --- Table Header ---
     doc.font('Courier-Bold');
-    drawTableRowHeader(
-        doc,
-        tableTop,
-        "SNo", "Item", "Qty", "Unit", "Rate", "Amt",
-        snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol
-    );
-    doc.font('Courier');
+    drawTableRow(doc, tableTop, "SNo", "Item", "Qty", "Uni", "Rate", "Amt", snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol);
     
     // Underline for header
-    const lineY = doc.y + 2;
-    doc.moveTo(snoCol, lineY).lineTo(amtCol, lineY).stroke();
+    const lineY = doc.y;
+    doc.moveTo(snoCol, lineY).lineTo(rightEdge, lineY).stroke();
     doc.moveDown(0.5);
 
     // --- Items Loop ---
     let totalAmount = 0;
     let totalQty = 0;
 
+    doc.font('Courier');
     invoiceDataArray.forEach((sale, index) => {
       const sno = (index + 1).toString();
-      const itemName = sale.itemId.itemName;
+      // Format item name to split into lines if needed
+      const itemName = formatItemName(sale.itemId.itemName, 14); // Max 14 chars per line
       const unit = sale.itemId.unit || 'pcs';
       const qty = sale.quantity.toString();
       const rate = parseFloat(sale.pricePerUnit).toFixed(2);
-      const amount = (sale.quantity * sale.pricePerUnit).toFixed(2); // Calculate amount directly
+      const amount = (sale.quantity * sale.pricePerUnit).toFixed(2);
 
       totalQty += parseInt(qty, 10) || 0;
       totalAmount += parseFloat(amount);
 
-      // --- Draw table row for this item ---
-      drawTableRow(
-          doc,
-          doc.y,
-          sno, itemName, qty, unit, rate, amount,
-          snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol
-      );
+      drawTableRow(doc, doc.y, sno, itemName, qty, unit, rate, amount, snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol);
     });
     
     // --- Final Separator line ---
-    const finalY = doc.y + 2;
-    doc.moveTo(snoCol, finalY).lineTo(amtCol, finalY).stroke();
-    doc.moveDown(1);
+    const finalY = doc.y;
+    doc.moveTo(snoCol, finalY).lineTo(rightEdge, finalY).stroke();
+    doc.moveDown(1.5);
 
     // --- Totals Section (matches image layout) ---
-    doc.font('Courier-Bold');
-    const totalsLabelX = 140; // X position for labels like "Subtotal:"
-    const totalsValueX = 220;  // X position for values like "2847.00"
+    doc.font('Courier-Bold').fontSize(10);
+    const totalsLabelX = 100; // X position for labels
+    const pageEndX = doc.page.width - doc.page.margins.right;
 
     // Total Qty
-    doc.text('Total Qty:', 10, doc.y, { align: 'right', width: totalsLabelX });
-    doc.text(totalQty.toString(), totalsLabelX, doc.y - doc.currentLineHeight(), { align: 'right', width: totalsValueX - totalsLabelX });
+    doc.text('Total Qty:', totalsLabelX, doc.y, { align: 'left'});
+    doc.text(totalQty.toString(), 0, doc.y - doc.currentLineHeight(), { align: 'right' });
 
     // Subtotal
-    doc.text('Subtotal:', 10, doc.y, { align: 'right', width: totalsLabelX });
-    doc.text(`Rs.`, totalsLabelX + 15, doc.y - doc.currentLineHeight(), { align: 'left' });
-    doc.text(totalAmount.toFixed(2), totalsLabelX, doc.y - doc.currentLineHeight(), { align: 'right', width: totalsValueX - totalsLabelX });
-
-    // Grand Total (assuming no discount as per image)
-    doc.font('Courier-Bold').fontSize(10);
-    doc.text('Grand Total:', 10, doc.y, { align: 'right', width: totalsLabelX });
-    doc.font('Courier-Bold').fontSize(9); // Match font size for value
-    doc.text(`Rs.`, totalsLabelX + 15, doc.y - doc.currentLineHeight(), { align: 'left' });
-    doc.text(totalAmount.toFixed(2), totalsLabelX, doc.y - doc.currentLineHeight(), { align: 'right', width: totalsValueX - totalsLabelX });
+    doc.text('Subtotal: Rs.', totalsLabelX, doc.y, { align: 'left'});
+    doc.text(totalAmount.toFixed(2), 0, doc.y - doc.currentLineHeight(), { align: 'right' });
+    
+    // Grand Total
+    doc.text('Grand Total: Rs.', totalsLabelX, doc.y, { align: 'left'});
+    doc.text(totalAmount.toFixed(2), 0, doc.y - doc.currentLineHeight(), { align: 'right' });
     
     doc.moveDown(2);
 
@@ -655,7 +663,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     doc
       .font('Courier')
       .fontSize(9)
-      .text('Thank you for your purchase!', { align: 'center' })
+      .text('Thank you for\nyour purchase!', { align: 'center', lineGap: 2 })
+      .moveDown(0.5)
       .text('Visit Again', { align: 'center' });
 
     doc.end();
@@ -665,33 +674,27 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
   });
 }
 
-
-function drawTableRowHeader(doc, y, sno, item, qty, unit, rate, amt, snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol) {
-    doc.text(sno, snoCol, y);
-    doc.text(item, itemCol, y);
-    doc.text(qty, qtyCol - 20, y, { width: 20, align: 'right' });
-    doc.text(unit, unitCol - 20, y, { width: 20, align: 'right' });
-    doc.text(rate, rateCol - 25, y, { width: 25, align: 'right' });
-    doc.text(amt, amtCol - 25, y, { width: 25, align: 'right' });
-}
-
+// Universal row drawer for header and data rows
 function drawTableRow(doc, y, sno, item, qty, unit, rate, amt, snoCol, itemCol, qtyCol, unitCol, rateCol, amtCol) {
-  const itemWidth = qtyCol - itemCol - 25;
+  const itemWidth = qtyCol - itemCol - 5;
   const initialY = y;
-
-  // Draw item name which might wrap
-  doc.text(item, itemCol, y, { width: itemWidth });
-  const itemHeight = doc.heightOfString(item, { width: itemWidth });
   
-  // Draw other columns aligned to the top of the row
-  doc.text(sno, snoCol, initialY);
-  doc.text(qty, qtyCol - 20, initialY, { width: 20, align: 'right' });
-  doc.text(unit, unitCol - 20, initialY, { width: 20, align: 'right' });
-  doc.text(rate, rateCol - 25, initialY, { width: 25, align: 'right' });
-  doc.text(amt, amtCol - 25, initialY, { width: 25, align: 'right' });
+  // The item text is drawn first, as it's the only one that can wrap.
+  // The `item` string may contain '\n' for manual line breaks.
+  doc.text(item, itemCol, initialY, { width: itemWidth });
+  
+  // We calculate the height of the item block to correctly position the next row.
+  const itemHeight = doc.heightOfString(item, { width: itemWidth });
 
-  // Update Y position based on the tallest element (the item name)
-  doc.y = initialY + itemHeight + 3; 
+  // Draw other columns, vertically aligned with the top of the row.
+  doc.text(sno, snoCol, initialY);
+  doc.text(qty, qtyCol, initialY, { width: 20, align: 'right' });
+  doc.text(unit, unitCol, initialY, { width: 20, align: 'right' });
+  doc.text(rate, rateCol, initialY, { width: 30, align: 'right' });
+  doc.text(amt, amtCol, initialY, { width: 35, align: 'right' });
+
+  // Set the new Y position after the tallest element (the item name) plus a small margin.
+  doc.y = initialY + itemHeight + 4;
 }
 
 exports.downloadSalesReport = async (req, res) => {
