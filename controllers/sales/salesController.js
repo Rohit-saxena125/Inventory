@@ -746,27 +746,22 @@ exports.downloadSalesReport = async (req, res) => {
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Constants for layout
-    const PAGE_WIDTH = 288; // 80mm in points
-    const LEFT_MARGIN = 10;
-    const RIGHT_MARGIN = 10;
-    const CONTENT_WIDTH = PAGE_WIDTH - LEFT_MARGIN - RIGHT_MARGIN;
+    // Page configuration
+    const PAGE_WIDTH = 288; // 80mm width
+    const MARGIN = 10;
+    const CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2);
     const LINE_HEIGHT = 20;
     const BASE_HEIGHT = 500;
-    
-    // Calculate dynamic height
-    let estimatedLines = 15; // Base lines for header/footer
-    
-    // Pre-calculate lines needed
+
+    // Calculate required height
+    let lineCount = 15; // Base lines for header/footer
     invoiceDataArray.forEach(sale => {
-      const itemName = String(sale.itemId.itemName || '');
-      // Estimate lines needed for this item (max 20 chars per line)
-      estimatedLines += Math.max(1, Math.ceil(itemName.length / 20));
+      lineCount += Math.max(1, Math.ceil(String(sale.itemId.itemName).length / 20));
     });
 
     const doc = new PDFDocument({
-      size: [PAGE_WIDTH, BASE_HEIGHT + estimatedLines * LINE_HEIGHT],
-      margins: { top: 10, bottom: 10, left: LEFT_MARGIN, right: RIGHT_MARGIN }
+      size: [PAGE_WIDTH, BASE_HEIGHT + (lineCount * LINE_HEIGHT)],
+      margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }
     });
 
     const stream = fs.createWriteStream(outputPath);
@@ -782,42 +777,41 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit'
     });
 
-    
+    // Header Section
+   
     // Invoice Info
     doc
       .fontSize(9)
-      .text(`Invoice: ${String(firstSale.invoiceNumber || '').padEnd(8)} Date: ${formattedDate.split(',')[0]}`)
+      .text(`Invoice: ${String(firstSale.invoiceNumber || '').padEnd(10)} Date: ${formattedDate.split(',')[0]}`)
       .text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`)
       .text(`Time: ${formattedDate.split(',')[1].trim()}`)
-      .text('--------------------------------')
+      .text('─'.repeat(40), { align: 'center' })
       .moveDown();
 
     // Table Configuration
     const columns = [
       { name: 'SN', width: 5, align: 'left' },
-      { name: 'Item Name', width: 25, align: 'left' },
-      { name: 'Qty', width: 8, align: 'right' },
+      { name: 'Item Name', width: 20, align: 'left' },
+      { name: 'Qty', width: 5, align: 'right' },
       { name: 'Unit', width: 8, align: 'right' },
-      { name: 'Rate', width: 15, align: 'right' },
+      { name: 'Rate', width: 12, align: 'right' },
       { name: 'Amount', width: 15, align: 'right' }
     ];
 
-    // Draw table header
-    let headerText = '';
-    columns.forEach(col => {
-      headerText += col.name.padEnd(col.width).substring(0, col.width);
-    });
+    // Draw Table Header
+    let headerText = columns.map(col => 
+      col.name.padEnd(col.width).substring(0, col.width)
+    ).join('');
     doc
       .font('Helvetica-Bold')
       .text(headerText)
       .font('Helvetica')
-      .text('-'.repeat(CONTENT_WIDTH));
+      .text('─'.repeat(CONTENT_WIDTH));
 
     let totalAmount = 0;
     let totalQty = 0;
-    let totalDiscount = 0;
 
-    // Draw table rows with dynamic line breaks
+    // Draw Table Rows with Dynamic Wrapping
     invoiceDataArray.forEach((sale, index) => {
       const row = {
         sn: String(index + 1),
@@ -825,7 +819,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         qty: String(sale.quantity || 0),
         unit: String(sale.itemId.units || 'pc').substring(0, 5).toUpperCase(),
         rate: `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
-        amount: `Rs.${parseAmount(sale.totalAmount || 0).toFixed(2)}`
+        amount: sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : ''
       };
 
       // Split item name into multiple lines if needed
@@ -857,32 +851,22 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         doc.text(rowText);
       });
 
-      // Add separator if item name spanned multiple lines
-      if (itemLines.length > 1) {
-        doc.moveDown(-0.5); // Reduce space between wrapped lines
+      if (sale.totalAmount) {
+        totalAmount += parseAmount(sale.totalAmount);
+        totalQty += parseInt(row.qty) || 0;
       }
-
-      totalQty += parseInt(row.qty) || 0;
-      totalAmount += parseAmount(sale.totalAmount || 0);
-      totalDiscount += parseAmount(sale.discount || 0);
     });
 
-    // Footer with totals
+    // Footer Section
     doc
       .moveDown()
-      .text('-'.repeat(CONTENT_WIDTH))
+      .text('─'.repeat(CONTENT_WIDTH))
       .font('Helvetica-Bold')
       .text(`Total Quantity:`.padEnd(30) + `${totalQty}`, { align: 'left' })
-      .text(`Sub Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
-    
-    if (totalDiscount > 0) {
-      doc.text(`Discount:`.padEnd(30) + `Rs. ${totalDiscount.toFixed(2)}`, { align: 'left' });
-    }
-    
-    doc
-      .text('-'.repeat(CONTENT_WIDTH))
-      .text(`Total:`.padEnd(30) + `Rs. ${(totalAmount - totalDiscount).toFixed(2)}`, { align: 'left' })
-      .text('='.repeat(CONTENT_WIDTH))
+      .text(`Sub Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
+      .text('─'.repeat(CONTENT_WIDTH))
+      .text(`Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
+      .text('═'.repeat(CONTENT_WIDTH))
       .moveDown()
       .fontSize(10)
       .text('Thank you!', { align: 'center' })
