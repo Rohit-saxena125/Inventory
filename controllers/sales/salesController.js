@@ -476,6 +476,7 @@ exports.fetchSalesReport = async (req, res) => {
     const invoiceMap = new Map();
     sales.forEach((sale) => {
       const invoiceNumber = sale.invoiceNumber;
+      const customerName = sale.customerName || '-';
       const saleCreatedBy = sale.createdBy?._id;
       const key = `${invoiceNumber}-${saleCreatedBy}`;
       const price = parseFloat(sale.pricePerUnit || 0);
@@ -484,6 +485,7 @@ exports.fetchSalesReport = async (req, res) => {
       if (!invoiceMap.has(key)) {
         invoiceMap.set(key, {
           invoiceNumber,
+          customerName,
           saleDate: sale.saleDate,
           totalAmount: 0,
         });

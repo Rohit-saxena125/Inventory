@@ -396,6 +396,7 @@ exports.addReduceInventory = async (req, res, next) => {
     const type = req.query.type;
     const itemId = req.params.id;
     const { quantity, pricePerUnit, description, saleDate } = req.body;
+    const item = await Inventory.findById({_id:itemId});
     if (req.query.transactionId) {
       let sale = await Sale.findById({ _id: req.query.transactionId });
       if (!sale) {
@@ -410,7 +411,7 @@ exports.addReduceInventory = async (req, res, next) => {
       const updateFields = {
   orderType: sale.orderType,
   quantity,
-  pricePerUnit,
+  pricePerUnit :sale?.orderType =="Reduce" && (pricePerUnit ==0 && sale.pricePerUnit ==0)?itemId.salePrice: pricePerUnit>0?pricePerUnit: sale.pricePerUnit,
   description,
 };
 if (saleDate) {
@@ -429,7 +430,7 @@ if (saleDate) {
       orderType: type,
       itemId: itemId,
       quantity: quantity,
-      pricePerUnit: pricePerUnit?pricePerUnit: 0,
+      pricePerUnit: type ==="Reduce" && pricePerUnit == 0? item.salePrice : pricePerUnit,
       description: description?description: null,
       saleDate: new Date(saleDate),
     });
