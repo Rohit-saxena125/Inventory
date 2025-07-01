@@ -835,6 +835,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
           rowText += row.sn.padEnd(columns[0].width);
           rowText += line.padEnd(columns[1].width);
           rowText += row.qty.padStart(columns[2].width);
+          rowText += row.unit.padStart(columns[2].width);
           rowText += row.rate.padStart(columns[3].width);
           rowText += row.amount.padStart(columns[4].width);
         } else {
