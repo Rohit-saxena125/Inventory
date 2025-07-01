@@ -531,182 +531,120 @@ function parseAmount(val) {
   }
   return 0;
 }
-function createInvoicePDF(invoice, path) {
-    let doc = new PDFDocument({ size: 'A4', margin: 50 });
+function parseAmount(val) {
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    return parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+  }
+  return 0;
+}
 
-    generateHeader(doc, invoice);
-    generateCustomerInformation(doc, invoice);
-    generateInvoiceTable(doc, invoice);
-    generateFooter(doc);
+async function createInvoicePDF(invoiceDataArray, outputPath) {
+  return new Promise((resolve, reject) => {
+    // Calculate dynamic height based on items (now considering multi-line names)
+    const baseHeight = 500;
+    const lineHeight = 30;
+    let estimatedLines = invoiceDataArray.length;
+    
+    // Pre-calculate how many lines each item name will take
+    invoiceDataArray.forEach(sale => {
+      const itemName = sale.itemId.itemName;
+      estimatedLines += Math.max(0, Math.ceil(itemName.length / 12) - 1);
+    });
+
+    const doc = new PDFDocument({
+      size: [288, baseHeight + estimatedLines * lineHeight], // 80mm wide
+      margins: { top: 10, bottom: 10, left: 10, right: 10 },
+    });
+
+    const stream = fs.createWriteStream(outputPath);
+    doc.pipe(stream);
+
+    const firstSale = invoiceDataArray[0]; // Assuming all sales are from the same invoice
+
+    const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    // HEADER
+    doc
+      .fontSize(12)
+      .font('Courier-Bold')
+      .text('', { align: 'center' })
+      .fontSize(9)
+      .text('------------------------------------');
+
+    // Customer + Invoice Info
+    doc
+      .font('Courier')
+      .text(`Customer   : ${firstSale.customerName}`)
+      .text(`Invoice No : ${firstSale.invoiceNumber}`)
+      .text(`Date       : ${formattedDate}`)
+      .text('-------------------------------------');
+
+    let totalDiscount = 0;
+    let totalAmount = 0;
+    let totalQty = 0;
+
+    // Table Heading
+    doc
+      .font('Courier-Bold')
+      .text('Item        Qty       Rate       Amt')
+      .font('Courier');
+
+    // Items Loop
+    invoiceDataArray.forEach((sale) => {
+      const itemName = sale.itemId.itemName;
+      const qty = sale.quantity.toString();
+      const rate = `Rs. ${parseFloat(sale.pricePerUnit).toFixed(2)}`;
+      const amount = parseAmount(sale.totalAmount).toFixed(2);
+
+      // Split long item names into multiple lines
+      const maxItemNameWidth = 12; // Characters
+      const nameLines = [];
+      
+      for (let i = 0; i < itemName.length; i += maxItemNameWidth) {
+        nameLines.push(itemName.substring(i, i + maxItemNameWidth));
+      }
+
+      // First line with all details
+      doc.text(
+        `${nameLines[0].padEnd(12)} ${qty.padEnd(4)} ${rate.padEnd(8)} Rs. ${amount}`
+      );
+
+      // Subsequent lines (just the item name continuation)
+      for (let i = 1; i < nameLines.length; i++) {
+        doc.text(nameLines[i]);
+      }
+
+      const discount = parseAmount(sale.discount);
+      totalQty += parseInt(qty, 10) || 0;
+      totalDiscount += discount;
+      totalAmount += parseFloat(amount);
+    });
+
+    doc
+      .font('Courier')
+      .text('----------------------------------------')
+      .font('Courier-Bold')
+      .text(`Discount   : Rs. ${totalDiscount.toFixed(2)}`)
+      .text(`Total Quantity  : ${totalQty}`)
+      .text(`Total      : Rs. ${totalAmount.toFixed(2)}`)
+      .text('=========================================')
+      .fontSize(10)
+      .text('Thank you for your purchase!', { align: 'center' })
+      .text('Visit Again', { align: 'center' });
 
     doc.end();
-    doc.pipe(fs.createWriteStream(path));
-    console.log(`Invoice PDF created successfully at: ${path}`);
-}
 
-function generateHeader(doc, invoice) {
-    // Replace 'logo.png' with your own logo file
-    // If you don't have a logo, you can comment this out.
-    try {
-        if (fs.existsSync('logo.png')) {
-            doc.image('logo.png', 50, 45, { width: 50 });
-        } else {
-            console.warn("logo.png not found. Skipping logo.");
-        }
-    } catch (error) {
-        console.error("Error loading logo:", error);
-    }
-    
-    doc
-        .fillColor('#444444')
-        .fontSize(20)
-        .text(invoice.company.name, 110, 57)
-        .fontSize(10)
-        .text(invoice.company.address, 200, 65, { align: 'right' })
-        .text(invoice.company.cityStateZip, 200, 80, { align: 'right' })
-        .moveDown();
-}
-
-function generateCustomerInformation(doc, invoice) {
-    doc.fillColor('#444444').fontSize(20).text('Invoice', 50, 160);
-
-    generateHr(doc, 185);
-
-    const customerInformationTop = 200;
-
-    doc
-        .fontSize(10)
-        .text('Invoice Number:', 50, customerInformationTop)
-        .font('Helvetica-Bold')
-        .text(invoice.invoice_nr, 150, customerInformationTop)
-        .font('Helvetica')
-        .text('Invoice Date:', 50, customerInformationTop + 15)
-        .text(formatDate(new Date()), 150, customerInformationTop + 15)
-        .text('Balance Due:', 50, customerInformationTop + 30)
-        .text(
-            formatCurrency(invoice.subtotal - invoice.paid),
-            150,
-            customerInformationTop + 30
-        )
-
-        .font('Helvetica-Bold')
-        .text(invoice.shipping.name, 300, customerInformationTop)
-        .font('Helvetica')
-        .text(invoice.shipping.address, 300, customerInformationTop + 15)
-        .text(
-            `${invoice.shipping.city}, ${invoice.shipping.state} ${invoice.shipping.postal_code}`,
-            300,
-            customerInformationTop + 30
-        )
-        .moveDown();
-
-    generateHr(doc, 252);
-}
-
-function generateInvoiceTable(doc, invoice) {
-    let i;
-    const invoiceTableTop = 330;
-
-    doc.font('Helvetica-Bold');
-    generateTableRow(
-        doc,
-        invoiceTableTop,
-        'Item',
-        'Unit Cost',
-        'Quantity',
-        'Line Total'
-    );
-    generateHr(doc, invoiceTableTop + 20);
-    doc.font('Helvetica');
-
-    for (i = 0; i < invoice.items.length; i++) {
-        const item = invoice.items[i];
-        const position = invoiceTableTop + (i + 1) * 30;
-        generateTableRow(
-            doc,
-            position,
-            item.item,
-            formatCurrency(item.price),
-            item.quantity,
-            formatCurrency(item.price * item.quantity)
-        );
-
-        generateHr(doc, position + 20);
-    }
-
-    const subtotalPosition = invoiceTableTop + (i + 1) * 30;
-    generateTableRow(
-        doc,
-        subtotalPosition,
-        '',
-        '',
-        'Subtotal',
-        formatCurrency(invoice.subtotal)
-    );
-
-    const paidToDatePosition = subtotalPosition + 20;
-    generateTableRow(
-        doc,
-        paidToDatePosition,
-        '',
-        '',
-        'Paid To Date',
-        formatCurrency(invoice.paid)
-    );
-
-    const duePosition = paidToDatePosition + 25;
-    doc.font('Helvetica-Bold');
-    generateTableRow(
-        doc,
-        duePosition,
-        '',
-        '',
-        'Balance Due',
-        formatCurrency(invoice.subtotal - invoice.paid)
-    );
-    doc.font('Helvetica');
-}
-
-function generateFooter(doc) {
-    doc
-        .fontSize(10)
-        .text(
-            'Payment is due within 15 days. Thank you for your business.',
-            50,
-            780,
-            { align: 'center', width: 500 }
-        );
-}
-
-// Helper functions for formatting and drawing
-function generateTableRow(doc, y, item, unitCost, quantity, lineTotal) {
-    doc
-        .fontSize(10)
-        .text(item, 50, y)
-        .text(unitCost, 280, y, { width: 90, align: 'right' })
-        .text(quantity, 370, y, { width: 90, align: 'right' })
-        .text(lineTotal, 0, y, { align: 'right' });
-}
-
-function generateHr(doc, y) {
-    doc
-        .strokeColor('#aaaaaa')
-        .lineWidth(1)
-        .moveTo(50, y)
-        .lineTo(550, y)
-        .stroke();
-}
-
-function formatCurrency(cents) {
-    return 'Rs. ' + (cents / 100).toFixed(2);
-}
-
-function formatDate(date) {
-    const day = date.getDate();
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
-
-    return year + '/' + month + '/' + day;
+    stream.on('finish', () => resolve(outputPath));
+    stream.on('error', reject);
+  });
 }
 
 exports.downloadSalesReport = async (req, res) => {
