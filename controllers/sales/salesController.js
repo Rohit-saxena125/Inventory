@@ -785,7 +785,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .text(`Invoice: ${String(firstSale.invoiceNumber || '').padEnd(10)} Date: ${formattedDate.split(',')[0]}`)
       .text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`)
       .text(`Time: ${formattedDate.split(',')[1].trim()}`)
-      .text('─'.repeat(40), { align: 'center' })
       .moveDown();
 
     // Table Configuration
@@ -863,7 +862,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       .text(`Total Quantity:`.padEnd(30) + `${totalQty}`, { align: 'left' })
       .text(`Sub Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
       .text(`Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
-      .text('═'.repeat(CONTENT_WIDTH))
       .moveDown()
       .fontSize(10)
       .text('Thank you!', { align: 'center' })
