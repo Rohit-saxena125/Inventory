@@ -879,156 +879,134 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
-async function createSalesReportPDF(
-  data,
-  headers,
-  outputPath,
-  type,
-  totalStockValue = 0
-) {
+async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    // Calculate dynamic height based on items
+    const baseHeight = 500;
+    const lineHeight = 30;
+    let estimatedLines = invoiceDataArray.length;
+    
+    // Pre-calculate lines needed for item names
+    invoiceDataArray.forEach(sale => {
+      const itemName = String(sale.itemId.itemName || '');
+      estimatedLines += Math.max(0, Math.ceil(itemName.length / 25) - 1);
+    });
+
+    const doc = new PDFDocument({
+      size: [288, baseHeight + estimatedLines * lineHeight],
+      margins: { top: 10, bottom: 10, left: 10, right: 10 },
+    });
+
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
-    // Title
-    doc.fontSize(14).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
+    const firstSale = invoiceDataArray[0];
 
-    const effectiveHeaders = getEffectiveHeaders(headers, type);
-    const columnCount = effectiveHeaders.length;
-    const tableWidth = 520;
-
-    // Assign more width to "Item Name"
-    const customWidths = {};
-    let remainingWidth = tableWidth;
-
-    effectiveHeaders.forEach((header) => {
-      if (header === 'Item Name') {
-        customWidths[header] = 200; // Wider space for item names
-        remainingWidth -= 200;
-      }
+    const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
     });
 
-    // Distribute remaining equally to other headers
-    const equalWidth =
-      remainingWidth / (columnCount - Object.keys(customWidths).length);
-    effectiveHeaders.forEach((header) => {
-      if (!customWidths[header]) {
-        customWidths[header] = equalWidth;
-      }
-    });
+    // Convert all values to strings explicitly
+    const invoiceNumber = String(firstSale.invoiceNumber || '');
+    const customerName = String(firstSale.customerName || '');
+    const datePart = formattedDate.split(',')[0] || '';
+    const timePart = formattedDate.split(',')[1] ? formattedDate.split(',')[1].trim() : '';
 
-    let y = doc.y;
-
-    // Draw header
-    doc.font('Helvetica-Bold').fontSize(10);
-    let x = 30;
-    effectiveHeaders.forEach((header) => {
-      doc.text(header, x, y, {
-        width: customWidths[header],
-        align: 'left',
-      });
-      x += customWidths[header];
-    });
-
-    // Header underline
-    y += 20;
+    // HEADER
     doc
-      .moveTo(30, y)
-      .lineTo(30 + tableWidth, y)
-      .stroke();
-    y += 2;
+      .fontSize(14)
+      .font('Courier-Bold')
+      .moveDown()
+      .text('------------------------------------', { align: 'center' });
 
-    // Draw rows
-    data.forEach((entry, index) => {
-      const rowStartY = y;
+    // Invoice Info
+    doc
+      .font('Courier')
+      .text(`Invoice #: ${invoiceNumber.padEnd(15)} Date: ${datePart}`)
+      .text(`Customer : ${customerName}`)
+      .text(`Time     : ${timePart}`)
+      .text('-------------------------------------');
 
-      // Calculate height for each cell
-      const rowHeights = effectiveHeaders.map((header) => {
-        const value = getValueByHeader(entry, header, index).toString();
-        return doc.heightOfString(value, {
-          width: customWidths[header] - 10,
-          align: 'left',
-        });
-      });
+    // Table Heading
+    doc
+      .font('Courier-Bold')
+      .text('No  Item Name              Qty  Unit  Rate      Amount')
+      .font('Courier')
+      .text('------------------------------------------------------');
 
-      const rowHeight = Math.max(...rowHeights, 20) + 8;
+    let totalDiscount = 0;
+    let totalAmount = 0;
+    let totalQty = 0;
+    let taxableAmount = 0;
+    let taxAmount = 0;
 
-      // Page break logic
-      if (y + rowHeight > doc.page.height - 50) {
-        doc.addPage();
-        y = 50;
-        x = 30;
-        doc.font('Helvetica-Bold').fontSize(10);
-        effectiveHeaders.forEach((header) => {
-          doc.text(header, x, y, {
-            width: customWidths[header],
-            align: 'left',
-          });
-          x += customWidths[header];
-        });
-        y += 22;
-        doc
-          .moveTo(30, y)
-          .lineTo(30 + tableWidth, y)
-          .stroke();
-        y += 2;
+    // Items Loop with dynamic name handling
+    invoiceDataArray.forEach((sale, index) => {
+      const serialNo = String(index + 1).padEnd(3);
+      const itemName = String(sale.itemId.itemName || '');
+      const qty = String(sale.quantity || '').padEnd(3);
+      const unit = String(sale.itemId.unit || 'pc').padEnd(4);
+      const rate = `Rs. ${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`.padEnd(7);
+      const amount = parseAmount(sale.totalAmount || 0).toFixed(2);
+
+      // Calculate space for item name
+      const maxItemNameWidth = 25;
+      const nameLines = [];
+      let remainingName = itemName;
+      
+      while (remainingName.length > 0) {
+        const line = remainingName.substring(0, maxItemNameWidth);
+        nameLines.push(line);
+        remainingName = remainingName.substring(maxItemNameWidth);
       }
 
-      // Draw row data
-      x = 30;
-      effectiveHeaders.forEach((header) => {
-        const value = getValueByHeader(entry, header, index).toString();
+      // First line with all details
+      doc.text(
+        `${serialNo} ${nameLines[0].padEnd(maxItemNameWidth)} ${qty} ${unit} ${rate} Rs. ${amount}`
+      );
 
-        // Draw borders
-        doc
-          .moveTo(x, y)
-          .lineTo(x, y + rowHeight)
-          .stroke();
-        doc
-          .moveTo(x + customWidths[header], y)
-          .lineTo(x + customWidths[header], y + rowHeight)
-          .stroke();
+      // Subsequent lines
+      for (let i = 1; i < nameLines.length; i++) {
+        doc.text(`    ${nameLines[i]}`);
+      }
 
-        // Text
-        doc
-          .font('Helvetica')
-          .fontSize(10)
-          .text(value, x + 5, y + 5, {
-            width: customWidths[header] - 10,
-            align: 'left',
-          });
-
-        x += customWidths[header];
-      });
-
-      // Bottom border
-      doc
-        .moveTo(30, y + rowHeight)
-        .lineTo(30 + tableWidth, y + rowHeight)
-        .stroke();
-      y += rowHeight;
+      const discount = parseAmount(sale.discount || 0);
+      totalQty += parseInt(qty, 10) || 0;
+      totalDiscount += discount;
+      totalAmount += parseFloat(amount);
+      taxAmount += parseFloat(amount) - (parseFloat(amount) / 1.05);
+      taxableAmount += parseFloat(amount) / 1.05;
     });
-    if (type === 'Inventory') {
-      const totalRowHeight = 20;
-      doc
-        .moveTo(30, y)
-        .lineTo(30 + tableWidth, y)
-        .stroke();
-      y += 5;
 
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10)
-        .text(`Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`, 30, y, {
-          align: 'right',
-          width: tableWidth,
-        });
-
-      y += totalRowHeight;
+    // Footer with totals
+    doc
+      .text('------------------------------------------------------')
+      .font('Courier-Bold')
+      .text(`Sub Total:`.padEnd(45) + `Rs. ${taxableAmount.toFixed(2)}`)
+      
+    if (totalDiscount > 0) {
+      doc.text(`Discount:`.padEnd(45) + `Rs. ${totalDiscount.toFixed(2)}`);
     }
+    
+    doc
+      .text('------------------------------------------------------')
+      .text(`Total Amount:`.padEnd(45) + `Rs. ${totalAmount.toFixed(2)}`)
+      .text('======================================================')
+      .fontSize(8)
+      .text(`Total Items: ${totalQty}`, { align: 'left' })
+      .moveDown()
+      .text('Thank you !', { align: 'center' })
+      .text('Visit Again', { align: 'center' })
+      .fontSize(6)
+      .moveDown()
 
     doc.end();
+
     stream.on('finish', () => resolve(outputPath));
     stream.on('error', reject);
   });
