@@ -875,6 +875,160 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
   });
 }
 
+async function createSalesReportPDF(
+  data,
+  headers,
+  outputPath,
+  type,
+  totalStockValue = 0
+) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    const stream = fs.createWriteStream(outputPath);
+    doc.pipe(stream);
+
+    // Title
+    doc.fontSize(14).text(`${type} Report`, { align: 'center' }).moveDown(1.5);
+
+    const effectiveHeaders = getEffectiveHeaders(headers, type);
+    const columnCount = effectiveHeaders.length;
+    const tableWidth = 520;
+
+    // Assign more width to "Item Name"
+    const customWidths = {};
+    let remainingWidth = tableWidth;
+
+    effectiveHeaders.forEach((header) => {
+      if (header === 'Item Name') {
+        customWidths[header] = 200; // Wider space for item names
+        remainingWidth -= 200;
+      }
+    });
+
+    // Distribute remaining equally to other headers
+    const equalWidth =
+      remainingWidth / (columnCount - Object.keys(customWidths).length);
+    effectiveHeaders.forEach((header) => {
+      if (!customWidths[header]) {
+        customWidths[header] = equalWidth;
+      }
+    });
+
+    let y = doc.y;
+
+    // Draw header
+    doc.font('Helvetica-Bold').fontSize(10);
+    let x = 30;
+    effectiveHeaders.forEach((header) => {
+      doc.text(header, x, y, {
+        width: customWidths[header],
+        align: 'left',
+      });
+      x += customWidths[header];
+    });
+
+    // Header underline
+    y += 20;
+    doc
+      .moveTo(30, y)
+      .lineTo(30 + tableWidth, y)
+      .stroke();
+    y += 2;
+
+    // Draw rows
+    data.forEach((entry, index) => {
+      const rowStartY = y;
+
+      // Calculate height for each cell
+      const rowHeights = effectiveHeaders.map((header) => {
+        const value = getValueByHeader(entry, header, index).toString();
+        return doc.heightOfString(value, {
+          width: customWidths[header] - 10,
+          align: 'left',
+        });
+      });
+
+      const rowHeight = Math.max(...rowHeights, 20) + 8;
+
+      // Page break logic
+      if (y + rowHeight > doc.page.height - 50) {
+        doc.addPage();
+        y = 50;
+        x = 30;
+        doc.font('Helvetica-Bold').fontSize(10);
+        effectiveHeaders.forEach((header) => {
+          doc.text(header, x, y, {
+            width: customWidths[header],
+            align: 'left',
+          });
+          x += customWidths[header];
+        });
+        y += 22;
+        doc
+          .moveTo(30, y)
+          .lineTo(30 + tableWidth, y)
+          .stroke();
+        y += 2;
+      }
+
+      // Draw row data
+      x = 30;
+      effectiveHeaders.forEach((header) => {
+        const value = getValueByHeader(entry, header, index).toString();
+
+        // Draw borders
+        doc
+          .moveTo(x, y)
+          .lineTo(x, y + rowHeight)
+          .stroke();
+        doc
+          .moveTo(x + customWidths[header], y)
+          .lineTo(x + customWidths[header], y + rowHeight)
+          .stroke();
+
+        // Text
+        doc
+          .font('Helvetica')
+          .fontSize(10)
+          .text(value, x + 5, y + 5, {
+            width: customWidths[header] - 10,
+            align: 'left',
+          });
+
+        x += customWidths[header];
+      });
+
+      // Bottom border
+      doc
+        .moveTo(30, y + rowHeight)
+        .lineTo(30 + tableWidth, y + rowHeight)
+        .stroke();
+      y += rowHeight;
+    });
+    if (type === 'Inventory') {
+      const totalRowHeight = 20;
+      doc
+        .moveTo(30, y)
+        .lineTo(30 + tableWidth, y)
+        .stroke();
+      y += 5;
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(`Total Stock Value: Rs. ${totalStockValue.toFixed(2)}`, 30, y, {
+          align: 'right',
+          width: tableWidth,
+        });
+
+      y += totalRowHeight;
+    }
+
+    doc.end();
+    stream.on('finish', () => resolve(outputPath));
+    stream.on('error', reject);
+  });
+}
 function getEffectiveHeaders(headers, type) {
   const defaultHeaders = {
     Sale: [
