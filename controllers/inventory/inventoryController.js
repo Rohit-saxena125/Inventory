@@ -118,7 +118,7 @@ exports.getAllInventory = async (req, res, next) => {
               break;
           }
           currentQuantity = currentQuantity;
-          currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
+          currentStockValue = currentStockValue;
         });
         return {
           ...item.toObject(),
@@ -181,7 +181,7 @@ exports.getInventoryById = async (req, res, next) => {
           break;
       }
       currentQuantity = currentQuantity;
-      currentStockValue = currentQuantity === 0 ? 0 : currentStockValue;
+      currentStockValue = currentStockValue;
     });
     const openingStock = sales.find((s) => s.orderType === 'Opening');
     inventory = inventory.toObject();
@@ -315,7 +315,7 @@ exports.reportInventory = async (req, res, next) => {
                 break;
             }
             currentQuantity = currentQuantity;
-            currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
+            currentStockValue =  currentStockValue;
           });
           return {
             item,
