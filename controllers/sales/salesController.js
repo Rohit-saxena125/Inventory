@@ -752,36 +752,35 @@ function pad(str, width, align = 'left') {
     ? ' '.repeat(padSize) + str
     : str + ' '.repeat(padSize);
 }
-
-// Parses amount from string or number
+// / Parses amount safely
 function parseAmount(val) {
   return typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val;
 }
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Page and layout config
-    const PAGE_WIDTH = 288; // 80mm paper
+    // Layout constants
+    const PAGE_WIDTH = 288; // 80mm paper width
     const MARGIN = 10;
     const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-    const LINE_HEIGHT = 15;
+    const LINE_HEIGHT = 14;
     const BASE_HEIGHT = 500;
 
-    // Estimate height
+    // Estimate height based on item count
     let lineCount = 15;
     invoiceDataArray.forEach(sale => {
-      lineCount += Math.max(1, Math.ceil(String(sale.itemId.itemName).length / 20));
+      lineCount += Math.ceil(String(sale.itemId.itemName || '').length / 22);
     });
 
     const doc = new PDFDocument({
-      size: [PAGE_WIDTH, BASE_HEIGHT + lineCount * LINE_HEIGHT],
+      size: [PAGE_WIDTH, BASE_HEIGHT + (lineCount * LINE_HEIGHT)],
       margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
 
-    // Use monospaced font for alignment
+    // Fonts
     doc.font('Courier').fontSize(9);
 
     const firstSale = invoiceDataArray[0];
@@ -795,84 +794,75 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     });
 
     // Header
-    doc.text(`Invoice: ${pad(firstSale.invoiceNumber || '', 10)} Date: ${formattedDate.split(',')[0]}`);
+    doc.text(`Invoice: ${firstSale.invoiceNumber || ''}   Date: ${formattedDate.split(',')[0]}`);
     doc.text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`);
     doc.text(`Time: ${formattedDate.split(',')[1].trim()}`);
-    doc.moveDown();
+    doc.moveDown(0.5);
 
-    // Table columns config
-    const columns = [
-      { name: 'SN', width: 4 },
-      { name: 'Item Name', width: 22 },
-      { name: 'Qty', width: 6 },
-      { name: 'Unit', width: 6 },
-      { name: 'Rate', width: 10 },
-      { name: 'Amount', width: 12 }
-    ];
+    // Column headers with fixed positions
+    const x = MARGIN;
+    const colX = {
+      sn: x,
+      name: x + 18,
+      qty: x + 142,
+      unit: x + 170,
+      rate: x + 195,
+      amount: x + 230
+    };
 
-    // Header row
-    const headerText = columns
-      .map(col => pad(col.name, col.width))
-      .join('');
-    doc.font('Courier-Bold').text(headerText).font('Courier');
+    doc.font('Courier-Bold');
+    doc.text('SN', colX.sn, doc.y, { width: 15 });
+    doc.text('Item Name', colX.name, doc.y, { width: 120 });
+    doc.text('Qty', colX.qty, doc.y, { width: 20, align: 'right' });
+    doc.text('Unit', colX.unit, doc.y, { width: 20, align: 'right' });
+    doc.text('Rate', colX.rate, doc.y, { width: 30, align: 'right' });
+    doc.text('Amount', colX.amount, doc.y, { width: 45, align: 'right' });
+    doc.font('Courier');
+    doc.moveDown(0.2);
 
     let totalAmount = 0;
     let totalQty = 0;
+    let currentY = doc.y;
 
-    // Table rows
+    // Rows
     invoiceDataArray.forEach((sale, index) => {
-      const row = {
-        sn: index + 1,
-        item: String(sale.itemId.itemName || ''),
-        qty: String(sale.quantity || 0),
-        unit: String(sale.itemId.units || 'pc').substring(0, 5).toUpperCase(),
-        rate: `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
-        amount: sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : ''
-      };
+      const itemName = String(sale.itemId.itemName || '');
+      const qty = String(sale.quantity || 0);
+      const unit = String(sale.itemId.units || 'pc').substring(0, 5).toUpperCase();
+      const rate = `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`;
+      const amount = sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : '';
 
-      // Split item name into lines
-      const itemLines = [];
-      let remainingName = row.item;
-      while (remainingName.length > 0) {
-        itemLines.push(remainingName.substring(0, 22));
-        remainingName = remainingName.substring(22);
-      }
+      const itemLines = itemName.match(/.{1,22}/g) || [''];
 
-      // Print lines
       itemLines.forEach((line, i) => {
-        let rowText = '';
         if (i === 0) {
-          rowText += pad(row.sn, columns[0].width);
-          rowText += pad(line, columns[1].width);
-          rowText += pad(row.qty, columns[2].width, 'right');
-          rowText += pad(row.unit, columns[3].width, 'right');
-          rowText += pad(row.rate, columns[4].width, 'right');
-          rowText += pad(row.amount, columns[5].width, 'right');
+          doc.text(String(index + 1), colX.sn, currentY, { width: 15 });
+          doc.text(line, colX.name, currentY, { width: 120 });
+          doc.text(qty, colX.qty, currentY, { width: 20, align: 'right' });
+          doc.text(unit, colX.unit, currentY, { width: 20, align: 'right' });
+          doc.text(rate, colX.rate, currentY, { width: 30, align: 'right' });
+          doc.text(amount, colX.amount, currentY, { width: 45, align: 'right' });
         } else {
-          rowText += pad('', columns[0].width);
-          rowText += pad(line, columns[1].width);
+          doc.text('', colX.sn, currentY, { width: 15 }); // empty SN
+          doc.text(line, colX.name, currentY, { width: 120 });
         }
-        doc.text(rowText);
+        currentY += LINE_HEIGHT;
       });
 
-      if (sale.totalAmount) {
-        totalAmount += parseAmount(sale.totalAmount);
-        totalQty += parseInt(row.qty) || 0;
-      }
+      totalAmount += parseAmount(sale.totalAmount || 0);
+      totalQty += parseInt(sale.quantity || 0);
     });
 
     // Footer
-    doc
-      .moveDown()
-      .font('Courier-Bold')
-      .text(`${pad('Total Quantity:', 30)}${totalQty}`)
-      .text(`${pad('Sub Total:', 30)}Rs. ${totalAmount.toFixed(2)}`)
-      .text(`${pad('Total:', 30)}Rs. ${totalAmount.toFixed(2)}`)
-      .moveDown()
-      .fontSize(10)
-      .text('Thank you!', { align: 'center' })
-      .text('Visit us again!', { align: 'center' })
-      .fontSize(6);
+    doc.moveDown(1);
+    doc.font('Courier-Bold');
+    doc.text(`Total Quantity:`.padEnd(22) + `${totalQty}`, { align: 'left' });
+    doc.text(`Sub Total:`.padEnd(22) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
+    doc.text(`Total:`.padEnd(22) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
+    doc.moveDown();
+    doc.fontSize(10).text('Thank you!', { align: 'center' });
+    doc.text('Visit us again!', { align: 'center' });
+    doc.fontSize(6);
 
     doc.end();
 
@@ -880,7 +870,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
-
 
 async function createSalesReportPDF(
   data,
