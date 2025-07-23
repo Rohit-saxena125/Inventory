@@ -452,28 +452,28 @@ exports.fetchInvoiceNumber = async (req, res) => {
 
 exports.fetchSalesReport = async (req, res) => {
   try {
-    const { startDate, endDate, userId } = req.query;
+    const { startDate, endDate, userId, page = 1, limit = 10 } = req.query;
+
     const query = { isDeleted: false, orderType: 'Sales' };
+
     if (userId) {
       query.createdBy = userId;
     }
+
     if (startDate && endDate) {
       query.saleDate = {
-        $gte: moment
-          .tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata')
-          .startOf('day')
-          .toDate(),
-        $lte: moment
-          .tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata')
-          .endOf('day')
-          .toDate(),
+        $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').toDate(),
+        $lte: moment.tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').toDate(),
       };
     }
+
     const sales = await Sale.find(query)
       .populate('itemId')
       .populate('createdBy')
       .sort({ createdAt: -1 });
+
     const invoiceMap = new Map();
+
     sales.forEach((sale) => {
       const invoiceNumber = sale.invoiceNumber;
       const customerName = sale.customerName || 'N/A';
@@ -482,6 +482,7 @@ exports.fetchSalesReport = async (req, res) => {
       const price = parseFloat(sale.pricePerUnit || 0);
       const qty = parseInt(sale.quantity, 10) || 0;
       const amount = price * qty;
+
       if (!invoiceMap.has(key)) {
         invoiceMap.set(key, {
           invoiceNumber,
@@ -490,13 +491,26 @@ exports.fetchSalesReport = async (req, res) => {
           totalAmount: 0,
         });
       }
+
       const invoiceData = invoiceMap.get(key);
       invoiceData.totalAmount += amount;
     });
+
     const uniqueInvoices = Array.from(invoiceMap.values());
+
+    // ✅ Pagination logic
+    const pageNum = parseInt(page, 10);
+    const pageSize = parseInt(limit, 10);
+    const startIndex = (pageNum - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    const paginatedInvoices = uniqueInvoices.slice(startIndex, endIndex);
+
     return successResponse(res, 'Sales report fetched successfully', {
-      count: uniqueInvoices.length,
-      invoices: uniqueInvoices,
+      totalCount: uniqueInvoices.length,
+      page: pageNum,
+      totalPages: Math.ceil(uniqueInvoices.length / pageSize),
+      invoices: paginatedInvoices,
     });
   } catch (error) {
     return internalServerErrorResponse(res, error);

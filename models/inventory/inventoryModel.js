@@ -4,6 +4,7 @@ const inventorySchema = new mongoose.Schema({
   itemName:{
     type:String,
     required: true,
+    index: true 
   },
   units:{
     type: String,

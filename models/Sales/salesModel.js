@@ -39,6 +39,7 @@ const salesSchema = new mongoose.Schema({
     },
     invoiceNumber:{
         type:Number,
+        index: true 
     },
     customerName:{
         type:String
