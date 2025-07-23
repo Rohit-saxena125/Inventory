@@ -855,7 +855,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const rate = `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`;
       const amount = sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : '';
 
-      const itemLines = wrapText(itemName, 22);
+      const itemLines = wrapText(itemName, 6);
 
 
       itemLines.forEach((line, i) => {
