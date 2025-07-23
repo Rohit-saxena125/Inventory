@@ -108,8 +108,7 @@ exports.getAllInventory = async (req, res, next) => {
               currentStockValue -= quantitySet * pricePerUnit;
               break;
             case 'Sales':
-              if (currentQuantity <= 0) break;
-              const avgCost = currentStockValue / currentQuantity;
+              const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
               const costOfGoodsSold = quantitySet * avgCost;
               currentQuantity -= quantitySet;
               currentStockValue -= costOfGoodsSold;
@@ -171,8 +170,7 @@ exports.getInventoryById = async (req, res, next) => {
           currentStockValue -= quantity * pricePerUnit;
           break;
         case 'Sales':
-          if (currentQuantity <= 0) break;
-          const avgCost = currentStockValue / currentQuantity;
+          const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
           const costOfGoodsSold = quantity * avgCost;
           currentQuantity -= quantity;
           currentStockValue -= costOfGoodsSold;
@@ -307,8 +305,7 @@ exports.reportInventory = async (req, res, next) => {
                 currentStockValue -= quantity * pricePerUnit;
                 break;
               case 'Sales':
-                if (currentQuantity <= 0) break;
-                const avgCost = currentStockValue / currentQuantity;
+                const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
                 const costOfGoodsSold = quantity * avgCost;
                 currentQuantity -= quantity;
                 currentStockValue -= costOfGoodsSold;

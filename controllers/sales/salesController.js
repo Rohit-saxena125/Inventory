@@ -662,8 +662,7 @@ exports.downloadSalesReport = async (req, res) => {
                 break;
               }
               case 'Sales': {
-                if (currentQuantity <= 0) break;
-                const avgCost = currentStockValue / currentQuantity;
+               const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
                 const costOfGoodsSold = quantitySet * avgCost;
                 currentQuantity -= quantitySet;
                 currentStockValue -= costOfGoodsSold;
