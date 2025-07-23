@@ -815,8 +815,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     // Table columns config
     const columns = [
-      { name: 'SN', width: 4 },
-      { name: 'Item Name', width: 22 },
+      { name: 'SN', width: 2 },
+      { name: 'Item Name', width: 12 },
       { name: 'Qty', width: 6 },
       { name: 'Unit', width: 6 },
       { name: 'Rate', width: 10 },
