@@ -757,16 +757,8 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
-// Padding utility for clean alignment
-function pad(str, width, align = 'left') {
-  str = String(str);
-  if (str.length >= width) return str.slice(0, width);
-  const padSize = width - str.length;
-  return align === 'right'
-    ? ' '.repeat(padSize) + str
-    : str + ' '.repeat(padSize);
-}
-// / Parses amount safely
+
+// Parses amount safely
 function parseAmount(val) {
   return typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val;
 }
@@ -818,19 +810,19 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     const colX = {
       sn: x,
       name: x + 18,
-      qty: x + 142,
+      qty: x + 145,
       unit: x + 170,
-      rate: x + 195,
-      amount: x + 230
+      rate: x + 200,
+      amount: x + 235
     };
 
     doc.font('Courier-Bold');
     doc.text('SN', colX.sn, doc.y, { width: 15 });
     doc.text('Item Name', colX.name, doc.y, { width: 120 });
-    doc.text('Qty', colX.qty, doc.y, { width: 20, align: 'right' });
-    doc.text('Unit', colX.unit, doc.y, { width: 20, align: 'right' });
-    doc.text('Rate', colX.rate, doc.y, { width: 30, align: 'right' });
-    doc.text('Amount', colX.amount, doc.y, { width: 45, align: 'right' });
+    doc.text('Qty', colX.qty, doc.y, { width: 20, align: 'right', lineBreak: false });
+    doc.text('Unit', colX.unit, doc.y, { width: 25, align: 'right', lineBreak: false });
+    doc.text('Rate', colX.rate, doc.y, { width: 35, align: 'right', lineBreak: false });
+    doc.text('Amount', colX.amount, doc.y, { width: 45, align: 'right', lineBreak: false });
     doc.font('Courier');
     doc.moveDown(0.2);
 
@@ -846,16 +838,16 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const rate = `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`;
       const amount = sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : '';
 
-      const itemLines = itemName.match(/.{1,22}/g) || [''];
+      const itemLines = doc.splitTextToSize(itemName, 120);
 
       itemLines.forEach((line, i) => {
         if (i === 0) {
           doc.text(String(index + 1), colX.sn, currentY, { width: 15 });
           doc.text(line, colX.name, currentY, { width: 120 });
-          doc.text(qty, colX.qty, currentY, { width: 20, align: 'right' });
-          doc.text(unit, colX.unit, currentY, { width: 20, align: 'right' });
-          doc.text(rate, colX.rate, currentY, { width: 30, align: 'right' });
-          doc.text(amount, colX.amount, currentY, { width: 45, align: 'right' });
+          doc.text(qty, colX.qty, currentY, { width: 20, align: 'right', lineBreak: false });
+          doc.text(unit, colX.unit, currentY, { width: 25, align: 'right', lineBreak: false });
+          doc.text(rate, colX.rate, currentY, { width: 35, align: 'right', lineBreak: false });
+          doc.text(amount, colX.amount, currentY, { width: 45, align: 'right', lineBreak: false });
         } else {
           doc.text('', colX.sn, currentY, { width: 15 }); // empty SN
           doc.text(line, colX.name, currentY, { width: 120 });
@@ -870,9 +862,9 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     // Footer
     doc.moveDown(1);
     doc.font('Courier-Bold');
-    doc.text(`Total Quantity:`.padEnd(22) + `${totalQty}`, { align: 'left' });
-    doc.text(`Sub Total:`.padEnd(22) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
-    doc.text(`Total:`.padEnd(22) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
+    doc.text(`Total Quantity: ${totalQty}`, { align: 'left' });
+    doc.text(`Sub Total: Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
+    doc.text(`Total: Rs. ${totalAmount.toFixed(2)}`, { align: 'left' });
     doc.moveDown();
     doc.fontSize(10).text('Thank you!', { align: 'center' });
     doc.text('Visit us again!', { align: 'center' });
