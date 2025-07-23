@@ -673,7 +673,7 @@ exports.downloadSalesReport = async (req, res) => {
                 break;
             }
             currentQuantity = currentQuantity;
-            currentStockValue = currentStockValue;
+            currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
           });
           return {
             itemName: item.itemName,
