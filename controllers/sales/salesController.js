@@ -762,6 +762,7 @@ exports.downloadSalesReport = async (req, res) => {
 function parseAmount(val) {
   return typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val;
 }
+
 function wrapText(text, maxLen) {
   const words = text.split(' ');
   const lines = [];
@@ -779,17 +780,13 @@ function wrapText(text, maxLen) {
   return lines;
 }
 
-
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Layout constants
     const PAGE_WIDTH = 288; // 80mm paper width
     const MARGIN = 10;
-    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
     const LINE_HEIGHT = 14;
     const BASE_HEIGHT = 500;
 
-    // Estimate height based on item count
     let lineCount = 15;
     invoiceDataArray.forEach(sale => {
       lineCount += Math.ceil(String(sale.itemId.itemName || '').length / 22);
@@ -802,8 +799,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
-
-    // Fonts
     doc.font('Courier').fontSize(9);
 
     const firstSale = invoiceDataArray[0];
@@ -816,21 +811,19 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit'
     });
 
-    // Header
     doc.text(`Invoice: ${firstSale.invoiceNumber || ''}   Date: ${formattedDate.split(',')[0]}`);
     doc.text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`);
     doc.text(`Time: ${formattedDate.split(',')[1].trim()}`);
     doc.moveDown(0.5);
 
-    // Column headers with fixed positions
     const x = MARGIN;
     const colX = {
       sn: x,
       name: x + 18,
-      qty: x + 145,
-      unit: x + 170,
-      rate: x + 200,
-      amount: x + 235
+      qty: x + 140,
+      unit: x + 165,
+      rate: x + 195,
+      amount: x + 230
     };
 
     doc.font('Courier-Bold');
@@ -847,7 +840,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     let totalQty = 0;
     let currentY = doc.y;
 
-    // Rows
     invoiceDataArray.forEach((sale, index) => {
       const itemName = String(sale.itemId.itemName || '');
       const qty = String(sale.quantity || 0);
@@ -855,8 +847,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const rate = `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`;
       const amount = sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : '';
 
-      const itemLines = wrapText(itemName, 6);
-
+      const itemLines = wrapText(itemName, 22);
 
       itemLines.forEach((line, i) => {
         if (i === 0) {
@@ -867,7 +858,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
           doc.text(rate, colX.rate, currentY, { width: 35, align: 'right', lineBreak: false });
           doc.text(amount, colX.amount, currentY, { width: 45, align: 'right', lineBreak: false });
         } else {
-          doc.text('', colX.sn, currentY, { width: 15 }); // empty SN
+          doc.text('', colX.sn, currentY, { width: 15 });
           doc.text(line, colX.name, currentY, { width: 120 });
         }
         currentY += LINE_HEIGHT;
@@ -877,7 +868,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       totalQty += parseInt(sale.quantity || 0);
     });
 
-    // Footer
     doc.moveDown(1);
     doc.font('Courier-Bold');
     doc.text(`Total Quantity: ${totalQty}`, { align: 'left' });
@@ -889,7 +879,6 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     doc.fontSize(6);
 
     doc.end();
-
     stream.on('finish', () => resolve(outputPath));
     stream.on('error', reject);
   });
