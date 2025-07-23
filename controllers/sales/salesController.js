@@ -743,28 +743,46 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
+// Padding utility for clean alignment
+function pad(str, width, align = 'left') {
+  str = String(str);
+  if (str.length >= width) return str.slice(0, width);
+  const padSize = width - str.length;
+  return align === 'right'
+    ? ' '.repeat(padSize) + str
+    : str + ' '.repeat(padSize);
+}
+
+// Parses amount from string or number
+function parseAmount(val) {
+  return typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val;
+}
+
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
-    // Page configuration
-    const PAGE_WIDTH = 288; // 80mm width
+    // Page and layout config
+    const PAGE_WIDTH = 288; // 80mm paper
     const MARGIN = 10;
-    const CONTENT_WIDTH = PAGE_WIDTH - (MARGIN * 2);
-    const LINE_HEIGHT = 20;
+    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+    const LINE_HEIGHT = 15;
     const BASE_HEIGHT = 500;
 
-    // Calculate required height
-    let lineCount = 15; // Base lines for header/footer
+    // Estimate height
+    let lineCount = 15;
     invoiceDataArray.forEach(sale => {
       lineCount += Math.max(1, Math.ceil(String(sale.itemId.itemName).length / 20));
     });
 
     const doc = new PDFDocument({
-      size: [PAGE_WIDTH, BASE_HEIGHT + (lineCount * LINE_HEIGHT)],
+      size: [PAGE_WIDTH, BASE_HEIGHT + lineCount * LINE_HEIGHT],
       margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }
     });
 
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
+
+    // Use monospaced font for alignment
+    doc.font('Courier').fontSize(9);
 
     const firstSale = invoiceDataArray[0];
     const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
@@ -776,42 +794,35 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       minute: '2-digit'
     });
 
-    // Header Section
-   
-    // Invoice Info
-    doc
-      .fontSize(9)
-      .text(`Invoice: ${String(firstSale.invoiceNumber || '').padEnd(10)} Date: ${formattedDate.split(',')[0]}`)
-      .text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`)
-      .text(`Time: ${formattedDate.split(',')[1].trim()}`)
-      .moveDown();
+    // Header
+    doc.text(`Invoice: ${pad(firstSale.invoiceNumber || '', 10)} Date: ${formattedDate.split(',')[0]}`);
+    doc.text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`);
+    doc.text(`Time: ${formattedDate.split(',')[1].trim()}`);
+    doc.moveDown();
 
-    // Table Configuration
+    // Table columns config
     const columns = [
-      { name: 'SN', width: 5, align: 'left' },
-      { name: 'Item Name', width: 20, align: 'left' },
-      { name: 'Qty', width: 5, align: 'right' },
-      { name: 'Unit', width: 8, align: 'right' },
-      { name: 'Rate', width: 12, align: 'right' },
-      { name: 'Amount', width: 15, align: 'right' }
+      { name: 'SN', width: 4 },
+      { name: 'Item Name', width: 22 },
+      { name: 'Qty', width: 6 },
+      { name: 'Unit', width: 6 },
+      { name: 'Rate', width: 10 },
+      { name: 'Amount', width: 12 }
     ];
 
-    // Draw Table Header
-    let headerText = columns.map(col => 
-      col.name.padEnd(col.width).substring(0, col.width)
-    ).join('');
-    doc
-      .font('Helvetica-Bold')
-      .text(headerText)
-      .font('Helvetica');
+    // Header row
+    const headerText = columns
+      .map(col => pad(col.name, col.width))
+      .join('');
+    doc.font('Courier-Bold').text(headerText).font('Courier');
 
     let totalAmount = 0;
     let totalQty = 0;
 
-    // Draw Table Rows with Dynamic Wrapping
+    // Table rows
     invoiceDataArray.forEach((sale, index) => {
       const row = {
-        sn: String(index + 1),
+        sn: index + 1,
         item: String(sale.itemId.itemName || ''),
         qty: String(sale.quantity || 0),
         unit: String(sale.itemId.units || 'pc').substring(0, 5).toUpperCase(),
@@ -819,32 +830,28 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
         amount: sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : ''
       };
 
-      // Split item name into multiple lines if needed
+      // Split item name into lines
       const itemLines = [];
       let remainingName = row.item;
       while (remainingName.length > 0) {
-        itemLines.push(remainingName.substring(0, 20));
-        remainingName = remainingName.substring(20);
+        itemLines.push(remainingName.substring(0, 22));
+        remainingName = remainingName.substring(22);
       }
 
-      // Print each line
-      itemLines.forEach((line, lineIndex) => {
+      // Print lines
+      itemLines.forEach((line, i) => {
         let rowText = '';
-        
-        if (lineIndex === 0) {
-          // First line shows all columns
-          rowText += row.sn.padEnd(columns[0].width);
-          rowText += line.padEnd(columns[1].width);
-          rowText += row.qty.padStart(columns[2].width);
-          rowText += row.unit.padStart(columns[3].width);
-          rowText += row.rate.padStart(columns[4].width);
-          rowText += row.amount.padStart(columns[5].width);
+        if (i === 0) {
+          rowText += pad(row.sn, columns[0].width);
+          rowText += pad(line, columns[1].width);
+          rowText += pad(row.qty, columns[2].width, 'right');
+          rowText += pad(row.unit, columns[3].width, 'right');
+          rowText += pad(row.rate, columns[4].width, 'right');
+          rowText += pad(row.amount, columns[5].width, 'right');
         } else {
-          // Subsequent lines only show item name continuation
-          rowText += ' '.repeat(columns[0].width);
-          rowText += line.padEnd(columns[1].width);
+          rowText += pad('', columns[0].width);
+          rowText += pad(line, columns[1].width);
         }
-        
         doc.text(rowText);
       });
 
@@ -854,18 +861,18 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       }
     });
 
-    // Footer Section
+    // Footer
     doc
       .moveDown()
-      .font('Helvetica-Bold')
-      .text(`Total Quantity:`.padEnd(30) + `${totalQty}`, { align: 'left' })
-      .text(`Sub Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
-      .text(`Total:`.padEnd(30) + `Rs. ${totalAmount.toFixed(2)}`, { align: 'left' })
+      .font('Courier-Bold')
+      .text(`${pad('Total Quantity:', 30)}${totalQty}`)
+      .text(`${pad('Sub Total:', 30)}Rs. ${totalAmount.toFixed(2)}`)
+      .text(`${pad('Total:', 30)}Rs. ${totalAmount.toFixed(2)}`)
       .moveDown()
       .fontSize(10)
       .text('Thank you!', { align: 'center' })
       .text('Visit us again!', { align: 'center' })
-      .fontSize(6)
+      .fontSize(6);
 
     doc.end();
 
@@ -873,6 +880,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
     stream.on('error', reject);
   });
 }
+
 
 async function createSalesReportPDF(
   data,
