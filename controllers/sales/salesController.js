@@ -762,6 +762,23 @@ exports.downloadSalesReport = async (req, res) => {
 function parseAmount(val) {
   return typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val;
 }
+function wrapText(text, maxLen) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+
+  for (const word of words) {
+    if ((line + word).length > maxLen) {
+      lines.push(line.trim());
+      line = word + ' ';
+    } else {
+      line += word + ' ';
+    }
+  }
+  if (line) lines.push(line.trim());
+  return lines;
+}
+
 
 async function createInvoicePDF(invoiceDataArray, outputPath) {
   return new Promise((resolve, reject) => {
@@ -838,7 +855,8 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       const rate = `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`;
       const amount = sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : '';
 
-      const itemLines = doc.splitTextToSize(itemName, 120);
+      const itemLines = wrapText(itemName, 22);
+
 
       itemLines.forEach((line, i) => {
         if (i === 0) {
