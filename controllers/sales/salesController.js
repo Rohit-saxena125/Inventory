@@ -174,7 +174,9 @@ exports.fetchSales = async (req, res) => {
         },
         {
           $project: {
-            itemName: '$item.itemName',
+            item: {
+      itemName: '$item.itemName'
+    },
             quantity: 1,
             customerName:1,
             pricePerUnit: 1,
