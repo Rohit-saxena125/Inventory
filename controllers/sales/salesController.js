@@ -449,149 +449,74 @@ exports.fetchInvoiceNumber = async (req, res) => {
     return internalServerErrorResponse(res, error);
   }
 };
+
+
 exports.fetchSalesReport = async (req, res) => {
   try {
     const { startDate, endDate, userId, page = 1, limit = 10 } = req.query;
 
-    const pageNum = parseInt(page, 10);
-    const pageSize = parseInt(limit, 10);
-
-    const match = {
-      isDeleted: false,
-      orderType: 'Sales',
-    };
+    const query = { isDeleted: false, orderType: 'Sales' };
 
     if (userId) {
-      match.createdBy = new mongoose.Types.ObjectId(userId);
+      query.createdBy = userId;
     }
 
     if (startDate && endDate) {
-      match.saleDate = {
+      query.saleDate = {
         $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').toDate(),
         $lte: moment.tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').toDate(),
       };
     }
 
-    const aggregatePipeline = [
-      { $match: match },
-      {
-        $addFields: {
-          invoiceKey: {
-            $concat: [
-              '$invoiceNumber',
-              '-',
-              { $toString: '$createdBy' },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: '$invoiceKey',
-          invoiceNumber: { $first: '$invoiceNumber' },
-          customerName: { $first: { $ifNull: ['$customerName', 'N/A'] } },
-          saleDate: { $first: '$saleDate' },
-          totalAmount: {
-            $sum: {
-              $multiply: [
-                { $toDouble: '$quantity' },
-                { $toDouble: '$pricePerUnit' },
-              ],
-            },
-          },
-        },
-      },
-      { $sort: { saleDate: -1 } },
-      {
-        $facet: {
-          metadata: [{ $count: 'total' }],
-          data: [{ $skip: (pageNum - 1) * pageSize }, { $limit: pageSize }],
-        },
-      },
-    ];
+    const sales = await Sale.find(query)
+      .populate('itemId')
+      .populate('createdBy')
+      .sort({ createdAt: -1 });
 
-    const [result] = await Sale.aggregate(aggregatePipeline);
+    const invoiceMap = new Map();
 
-    const totalCount = result.metadata[0]?.total || 0;
-    const totalPages = Math.ceil(totalCount / pageSize);
+    sales.forEach((sale) => {
+      const invoiceNumber = sale.invoiceNumber;
+      const customerName = sale.customerName || 'N/A';
+      const saleCreatedBy = sale.createdBy?._id;
+      const key = `${invoiceNumber}-${saleCreatedBy}`;
+      const price = parseFloat(sale.pricePerUnit || 0);
+      const qty = parseInt(sale.quantity, 10) || 0;
+      const amount = price * qty;
+
+      if (!invoiceMap.has(key)) {
+        invoiceMap.set(key, {
+          invoiceNumber,
+          customerName,
+          saleDate: sale.saleDate,
+          totalAmount: 0,
+        });
+      }
+
+      const invoiceData = invoiceMap.get(key);
+      invoiceData.totalAmount += amount;
+    });
+
+    const uniqueInvoices = Array.from(invoiceMap.values());
+
+    // ✅ Pagination logic
+    const pageNum = parseInt(page, 10);
+    const pageSize = parseInt(limit, 10);
+    const startIndex = (pageNum - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    const paginatedInvoices = uniqueInvoices.slice(startIndex, endIndex);
 
     return successResponse(res, 'Sales report fetched successfully', {
-      totalCount,
+      totalCount: uniqueInvoices.length,
       page: pageNum,
-      totalPages,
-      invoices: result.data,
+      totalPages: Math.ceil(uniqueInvoices.length / pageSize),
+      invoices: paginatedInvoices,
     });
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
 };
-
-// exports.fetchSalesReport = async (req, res) => {
-//   try {
-//     const { startDate, endDate, userId, page = 1, limit = 10 } = req.query;
-
-//     const query = { isDeleted: false, orderType: 'Sales' };
-
-//     if (userId) {
-//       query.createdBy = userId;
-//     }
-
-//     if (startDate && endDate) {
-//       query.saleDate = {
-//         $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').toDate(),
-//         $lte: moment.tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').toDate(),
-//       };
-//     }
-
-//     const sales = await Sale.find(query)
-//       .populate('itemId')
-//       .populate('createdBy')
-//       .sort({ createdAt: -1 });
-
-//     const invoiceMap = new Map();
-
-//     sales.forEach((sale) => {
-//       const invoiceNumber = sale.invoiceNumber;
-//       const customerName = sale.customerName || 'N/A';
-//       const saleCreatedBy = sale.createdBy?._id;
-//       const key = `${invoiceNumber}-${saleCreatedBy}`;
-//       const price = parseFloat(sale.pricePerUnit || 0);
-//       const qty = parseInt(sale.quantity, 10) || 0;
-//       const amount = price * qty;
-
-//       if (!invoiceMap.has(key)) {
-//         invoiceMap.set(key, {
-//           invoiceNumber,
-//           customerName,
-//           saleDate: sale.saleDate,
-//           totalAmount: 0,
-//         });
-//       }
-
-//       const invoiceData = invoiceMap.get(key);
-//       invoiceData.totalAmount += amount;
-//     });
-
-//     const uniqueInvoices = Array.from(invoiceMap.values());
-
-//     // ✅ Pagination logic
-//     const pageNum = parseInt(page, 10);
-//     const pageSize = parseInt(limit, 10);
-//     const startIndex = (pageNum - 1) * pageSize;
-//     const endIndex = startIndex + pageSize;
-
-//     const paginatedInvoices = uniqueInvoices.slice(startIndex, endIndex);
-
-//     return successResponse(res, 'Sales report fetched successfully', {
-//       totalCount: uniqueInvoices.length,
-//       page: pageNum,
-//       totalPages: Math.ceil(uniqueInvoices.length / pageSize),
-//       invoices: paginatedInvoices,
-//     });
-//   } catch (error) {
-//     return internalServerErrorResponse(res, error);
-//   }
-// };
 
 async function updateInvoiceNumber(invoiceNumber) {
   const isinvoiceNumber = await InvoiceCounter.findOne({
