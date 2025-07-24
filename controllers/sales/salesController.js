@@ -14,77 +14,11 @@ const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
 
-// exports.fetchSales = async (req, res) => {
-//   try {
-//     const {
-//       page,
-//       limit,
-//       search,
-//       itemId,
-//       startDate,
-//       endDate,
-//       userId,
-//       invoiceNumber,
-//     } = req.query;
-//     const query = { isDeleted: false };
-//     if (itemId) {
-//       query.itemId = itemId;
-//     } else {
-//       query.orderType = 'Sales';
-//     }
-//     if (userId) {
-//       query.createdBy = userId;
-//     }
-//     if (startDate && endDate) {
-//       query.saleDate = {
-//         $gte: moment.tz(startDate, 'Asia/Kolkata').utc().toDate(),
-//         $lte: moment.tz(endDate, 'Asia/Kolkata').utc().toDate(),
-//       };
-//     }
-//     if (search) {
-//       query.orderType = {
-//         $regex: search,
-//         $options: 'i',
-//       };
-//     }
-//     if (invoiceNumber) {
-//       query.invoiceNumber = invoiceNumber;
-//       // query.createdBy = req.user._id;
-//     }
-//     const populate = [{ path: 'itemId', select: 'itemName' }];
-//     const sales = await pagination(
-//       Sale,
-//       query,
-//       page,
-//       limit,
-//       null,
-//       null,
-//       populate
-//     );
-//     sales.result = await Promise.all(
-//       sales.result.map(async (item) => {
-//         const totalPrice = (
-//           parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
-//         ).toFixed(2);
-//         if (item.discount === '') {
-//           item.discount = 0;
-//         }
-//         return {
-//           ...item.toObject(),
-//           totalPrice: totalPrice - parseFloat(item.discount),
-//         };
-//       })
-//     );
-//     return successResponse(res, 'Sales fetched successfully', sales);
-//   } catch (error) {
-//     return internalServerErrorResponse(res, error);
-//   }
-// };
 exports.fetchSales = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
+      page,
+      limit,
       search,
       itemId,
       startDate,
@@ -92,117 +26,61 @@ exports.fetchSales = async (req, res) => {
       userId,
       invoiceNumber,
     } = req.query;
-
-    const match = { isDeleted: false };
-
+    const query = { isDeleted: false };
     if (itemId) {
-      match.itemId = new mongoose.Types.ObjectId(itemId);
+      query.itemId = itemId;
     } else {
-      match.orderType = 'Sales';
+      query.orderType = 'Sales';
     }
-
     if (userId) {
-      match.createdBy = new mongoose.Types.ObjectId(userId);
+      query.createdBy = userId;
     }
-
     if (startDate && endDate) {
-      match.saleDate = {
-        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').utc().toDate(),
-        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
+      query.saleDate = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').utc().toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').utc().toDate(),
       };
     }
-
     if (search) {
-      match.orderType = { $regex: search, $options: 'i' };
+      query.orderType = {
+        $regex: search,
+        $options: 'i',
+      };
     }
-
     if (invoiceNumber) {
-      match.invoiceNumber = invoiceNumber;
+      query.invoiceNumber = invoiceNumber;
+      // query.createdBy = req.user._id;
     }
-
-    const pageNum = parseInt(page);
-    const pageSize = parseInt(limit);
-    const skip = (pageNum - 1) * pageSize;
-
-    const [result, total] = await Promise.all([
-      Sale.aggregate([
-        { $match: match },
-        {
-          $lookup: {
-            from: 'items',
-            localField: 'itemId',
-            foreignField: '_id',
-            as: 'item',
-          },
-        },
-        { $unwind: { path: '$item', preserveNullAndEmptyArrays: true } },
-        {
-          $addFields: {
-            totalPrice: {
-              $subtract: [
-                {
-                  $multiply: [
-                    {
-                      $convert: {
-                        input: '$pricePerUnit',
-                        to: 'double',
-                        onError: 0,
-                        onNull: 0,
-                      },
-                    },
-                    {
-                      $convert: {
-                        input: '$quantity',
-                        to: 'double',
-                        onError: 0,
-                        onNull: 0,
-                      },
-                    },
-                  ],
-                },
-                {
-                  $convert: {
-                    input: '$discount',
-                    to: 'double',
-                    onError: 0,
-                    onNull: 0,
-                  },
-                },
-              ],
-            },
-          },
-        },
-        {
-          $project: {
-            itemName: '$item.itemName',
-            quantity: 1,
-            customerName:1,
-            pricePerUnit: 1,
-            discount: 1,
-            saleDate: 1,
-            orderType: 1,
-            invoiceNumber: 1,
-            createdBy: 1,
-            totalPrice: 1,
-          },
-        },
-        { $sort: { saleDate: -1 } },
-        { $skip: skip },
-        { $limit: pageSize },
-      ]),
-      Sale.countDocuments(match),
-    ]);
-
-    return successResponse(res, 'Sales fetched successfully', {
-      result,
-      totalCount: total,
-      page: pageNum,
-      totalPages: Math.ceil(total / pageSize),
-    });
+    const populate = [{ path: 'itemId', select: 'itemName' }];
+    const sales = await pagination(
+      Sale,
+      query,
+      page,
+      limit,
+      null,
+      null,
+      populate
+    );
+    sales.result = await Promise.all(
+      sales.result.map(async (item) => {
+        const totalPrice = (
+          parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
+        ).toFixed(2);
+        if (item.discount === '') {
+          item.discount = 0;
+        }
+        return {
+          ...item.toObject(),
+          totalPrice: totalPrice - parseFloat(item.discount),
+        };
+      })
+    );
+    return successResponse(res, 'Sales fetched successfully', sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
 };
+
 
 
 exports.fetchSalesById = async (req, res) => {
