@@ -56,6 +56,6 @@ const salesSchema = new mongoose.Schema({
         default: false,
     },
 },{timestamps:true, versionKey:false});
-salesSchema.createIndex({ itemId: 1, createdAt: 1, orderType: 1 });
+salesSchema.index({ itemId: 1, createdAt: 1, orderType: 1 });
 
 module.exports = mongoose.model("Sale",salesSchema);
