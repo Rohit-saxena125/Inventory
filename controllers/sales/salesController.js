@@ -140,8 +140,34 @@ exports.fetchSales = async (req, res) => {
           $addFields: {
             totalPrice: {
               $subtract: [
-                { $multiply: [{ $toDouble: '$pricePerUnit' }, { $toDouble: '$quantity' }] },
-                { $toDouble: { $ifNull: ['$discount', 0] } },
+                {
+                  $multiply: [
+                    {
+                      $convert: {
+                        input: '$pricePerUnit',
+                        to: 'double',
+                        onError: 0,
+                        onNull: 0,
+                      },
+                    },
+                    {
+                      $convert: {
+                        input: '$quantity',
+                        to: 'double',
+                        onError: 0,
+                        onNull: 0,
+                      },
+                    },
+                  ],
+                },
+                {
+                  $convert: {
+                    input: '$discount',
+                    to: 'double',
+                    onError: 0,
+                    onNull: 0,
+                  },
+                },
               ],
             },
           },
@@ -176,6 +202,7 @@ exports.fetchSales = async (req, res) => {
     return internalServerErrorResponse(res, error);
   }
 };
+
 
 exports.fetchSalesById = async (req, res) => {
   try {
