@@ -757,142 +757,153 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
-function pad(str, width, align = 'left') {
-  str = String(str);
-  if (str.length >= width) return str.slice(0, width);
-  const padSize = width - str.length;
-  return align === 'right'
-    ? ' '.repeat(padSize) + str
-    : str + ' '.repeat(padSize);
-}
+ function pad(str, width, align = "left") {
+   str = String(str);
+   if (str.length >= width) return str.slice(0, width);
+   const padSize = width - str.length;
+   return align === "right"
+     ? " ".repeat(padSize) + str
+     : str + " ".repeat(padSize);
+ }
+ 
+ function parseAmount(val) {
+   return typeof val === "string"
+     ? parseFloat(val.replace(/[^\d.-]/g, ""))
+     : val;
+ }
+ 
+ async function createInvoicePDF(invoiceDataArray, outputPath) {
+   return new Promise((resolve, reject) => {
+     const PAGE_WIDTH = 288; // 80mm
+     const MARGIN = 12;
+     const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+     const LINE_HEIGHT = 13;
+ 
+     let lineCount = 15;
+     invoiceDataArray.forEach((sale) => {
+       const nameLength = String(sale.itemId.itemName).length;
+       lineCount += Math.ceil(nameLength / 10) + 1;
+     });
+ 
+     const doc = new PDFDocument({
+       size: [PAGE_WIDTH, 30 + lineCount * LINE_HEIGHT],
+       margins: {
+         top: 30,
+         bottom: MARGIN,
+         left: MARGIN,
+         right: MARGIN,
+       },
+     });
+ 
+     const stream = fs.createWriteStream(outputPath);
+     doc.pipe(stream);
+ 
+     doc.font("Courier").fontSize(9);
+ 
+     const firstSale = invoiceDataArray[0];
+     const formattedDate = new Date(firstSale.saleDate).toLocaleString("en-IN", {
+       timeZone: "Asia/Kolkata",
+       year: "numeric",
+       month: "short",
+       day: "2-digit",
+       hour: "2-digit",
+       minute: "2-digit",
+     });
+ 
+     // Header
+     doc.text(
+       `Invoice: ${pad(firstSale.invoiceNumber || "", 10)} Date: ${formattedDate.split(",")[0]
+       }`
+     );
+     doc.text(
+      `Customer: ${String(firstSale.customerName || "").substring(0, 25)}`
+     );
+     doc.text(`Time: ${formattedDate.split(",")[1].trim()}`);
+     doc.moveDown();
+     doc.text("=".repeat(48));
+ 
+     const columns = {
+       sn: 3,
+       item: 12,
+       qty: 5,
+       unit: 6,
+       rate: 8,
+       amount: 10,
+     };
+ 
+     const header = [
+       pad("SN", columns.sn),
+       pad("Item Name", columns.item),
+       pad("Qty", columns.qty, "right"),
+       pad("Unit", columns.unit, "right"),
+       pad("Rate", columns.rate, "right"),
+       pad("Amount", columns.amount, "right"),
+     ].join("");
+     doc.font("Courier-Bold").text(header).font("Courier");
+     doc.text("=".repeat(48));
+ 
+     let totalQty = 0;
+     let totalAmount = 0;
+ 
+     invoiceDataArray.forEach((sale, index) => {
+       const itemName = String(sale.itemId.itemName || "");
+       const nameLines = [];
+ 
+       for (let i = 0; i < itemName.length; i += 10) {
+         nameLines.push(itemName.substring(i, i + 10));
+       }
+ 
+       const row = {
+         sn: String(index + 1),
+         qty: String(sale.quantity || 0),
+         unit: String(sale.itemId.units || "PC")
+           .substring(0, 5)
+           .toUpperCase(),
+         rate: `${parseFloat(sale.pricePerUnit).toFixed(2)}`,
+         amount: `${parseAmount(sale.totalAmount).toFixed(2)}`,
+       };
+ 
+       nameLines.forEach((line, i) => {
+         const rowText = [
+           pad(i === 0 ? row.sn : "", columns.sn),
+           pad(line, columns.item),
+           pad(i === 0 ? row.qty : "", columns.qty, "right"),
+           pad(i === 0 ? row.unit : "", columns.unit, "right"),
+           pad(i === 0 ? row.rate : "", columns.rate, "right"),
+           pad(i === 0 ? row.amount : "", columns.amount, "right"),
+         ].join("");
+         doc.text(rowText);
+       });
+ 
+       doc.text("-".repeat(48));
+       totalQty += parseInt(row.qty);
+       totalAmount += parseAmount(sale.totalAmount);
+     });
+ 
+     doc.moveDown().font("Courier-Bold");
+     doc.text("=".repeat(48));
+     doc.text(
+       pad("Total Quantity:", 30) + pad(totalQty, 18, "right")
+     );
+     doc.text(
+       pad("Sub Total:", 30) +
+       pad(`${totalAmount.toFixed(2)}`, 18, "right")
+     );
+     doc.text(
+       pad("Total:", 30) +
+       pad(`${totalAmount.toFixed(2)}`, 18, "right")
+     );
+     doc.text("=".repeat(48));
+     doc.moveDown().fontSize(10).text("Thank you!", { align: "center" });
+     doc.text("Visit us again!", { align: "center" }).fontSize(6);
+ 
+     doc.end();
+ 
+     stream.on("finish", () => resolve(outputPath));
+     stream.on("error", reject);
+   });
+ }
 
-// Parses amount from string or number
-function parseAmount(val) {
-  return typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val;
-}
-
-async function createInvoicePDF(invoiceDataArray, outputPath) {
-  return new Promise((resolve, reject) => {
-    // Page and layout config
-    const PAGE_WIDTH = 288; // 80mm paper
-    const MARGIN = 10;
-    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-    const LINE_HEIGHT = 15;
-    const BASE_HEIGHT = 500;
-
-    // Estimate height
-    let lineCount = 15;
-    invoiceDataArray.forEach(sale => {
-      lineCount += Math.max(1, Math.ceil(String(sale.itemId.itemName).length / 20));
-    });
-
-    const doc = new PDFDocument({
-      size: [PAGE_WIDTH, BASE_HEIGHT + lineCount * LINE_HEIGHT],
-      margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }
-    });
-
-    const stream = fs.createWriteStream(outputPath);
-    doc.pipe(stream);
-
-    // Use monospaced font for alignment
-    doc.font('Courier').fontSize(9);
-
-    const firstSale = invoiceDataArray[0];
-    const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    // Header
-    doc.text(`Invoice: ${pad(firstSale.invoiceNumber || '', 10)} Date: ${formattedDate.split(',')[0]}`);
-    doc.text(`Customer: ${String(firstSale.customerName || '').substring(0, 25)}`);
-    doc.text(`Time: ${formattedDate.split(',')[1].trim()}`);
-    doc.moveDown();
-
-    // Table columns config
-    const columns = [
-      { name: 'SN', width: 3 },
-      { name: 'Item Name', width: 12},
-      { name: 'Qty', width: 6 },
-      { name: 'Unit', width: 6 },
-      { name: 'Rate', width: 9 },
-      { name: 'Amount', width: 11 }
-    ];
-
-    // Header row
-    const headerText = columns
-      .map(col => pad(col.name, col.width))
-      .join('');
-    doc.font('Courier-Bold').text(headerText).font('Courier');
-
-    let totalAmount = 0;
-    let totalQty = 0;
-
-    // Table rows
-    invoiceDataArray.forEach((sale, index) => {
-      const row = {
-        sn: index + 1,
-        item: String(sale.itemId.itemName || ''),
-        qty: String(sale.quantity || 0),
-        unit: String(sale.itemId.units || 'pc').substring(0, 5).toUpperCase(),
-        rate: `Rs.${parseFloat(sale.pricePerUnit || 0).toFixed(2)}`,
-        amount: sale.totalAmount ? `Rs.${parseAmount(sale.totalAmount).toFixed(2)}` : ''
-      };
-
-      // Split item name into lines
-      const itemLines = [];
-      let remainingName = row.item;
-      while (remainingName.length > 0) {
-        itemLines.push(remainingName.substring(0, 22));
-        remainingName = remainingName.substring(22);
-      }
-
-      // Print lines
-      itemLines.forEach((line, i) => {
-        let rowText = '';
-        if (i === 0) {
-          rowText += pad(row.sn, columns[0].width);
-          rowText += pad(line, columns[1].width);
-          rowText += pad(row.qty, columns[2].width, 'right');
-          rowText += pad(row.unit, columns[3].width, 'right');
-          rowText += pad(row.rate, columns[4].width, 'right');
-          rowText += pad(row.amount, columns[5].width, 'right');
-        } else {
-          rowText += pad('', columns[0].width);
-          rowText += pad(line, columns[1].width);
-        }
-        doc.text(rowText);
-      });
-
-      if (sale.totalAmount) {
-        totalAmount += parseAmount(sale.totalAmount);
-        totalQty += parseInt(row.qty) || 0;
-      }
-    });
-
-    // Footer
-    doc
-      .moveDown()
-      .font('Courier-Bold')
-      .text(`${pad('Total Quantity:', 30)}${totalQty}`)
-      .text(`${pad('Sub Total:', 30)}Rs. ${totalAmount.toFixed(2)}`)
-      .text(`${pad('Total:', 30)}Rs. ${totalAmount.toFixed(2)}`)
-      .moveDown()
-      .fontSize(10)
-      .text('Thank you!', { align: 'center' })
-      .text('Visit us again!', { align: 'center' })
-      .fontSize(6);
-
-    doc.end();
-
-    stream.on('finish', () => resolve(outputPath));
-    stream.on('error', reject);
-  });
-}
 
 
 async function createSalesReportPDF(
