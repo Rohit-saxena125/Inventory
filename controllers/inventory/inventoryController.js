@@ -51,24 +51,28 @@ exports.getAllInventory = async (req, res, next) => {
     let {
       page,
       limit,
-      search ='',
+      search = '',
       startDate,
       endDate,
       qty,
       outOfStock,
       inActive,
     } = req.query;
+
+    // Parse boolean flags safely
+    const toBool = (val) => String(val).toLowerCase() === 'true';
+
     const query = {};
+
+    // Date filtering
     if (startDate && endDate) {
       query.createdAt = {
-        $gte: moment
-          .tz(startDate,'DD-MM-YYYY', 'Asia/Kolkata')
-          .startOf('day')
-          .utc()
-          .toDate(),
-        $lte: moment.tz(endDate,'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').utc().toDate(),
+        $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').utc().toDate(),
+        $lte: moment.tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').utc().toDate(),
       };
     }
+
+    // Search filtering
     search = String(search).trim();
     if (search) {
       const cleaned = search.replace(/[^a-zA-Z0-9]/g, '');
@@ -78,69 +82,106 @@ exports.getAllInventory = async (req, res, next) => {
         $options: 'i',
       };
     }
+
+    // Paginate Inventory
     let inventory = await pagination(Inventory, query, page, limit);
-    inventory.result = await Promise.all(
-      inventory.result.map(async (item) => {
-        const openingStock = await Sale.findOne({
-          orderType: 'Opening',
-          itemId: item._id,
-        }).sort({ createdAt: -1 });
-        const sales = await Sale.find({ itemId: item._id }).sort({
-          createdAt: 1,
-        });
-        let currentQuantity = 0;
-        let currentStockValue = 0;
-        let lastSaleDate = null;
-        sales.forEach((sale) => {
-          const quantitySet = parseInt(sale.quantity, 10) || 0;
-          const pricePerUnit = parseFloat(sale.pricePerUnit);
-          if (sale.orderType === 'Sales' && lastSaleDate === null) {
-            lastSaleDate = sale.createdAt;
-          }
-          switch (sale.orderType) {
-            case 'Opening':
-            case 'Add':
-              currentQuantity += quantitySet;
-              currentStockValue += quantitySet * pricePerUnit;
-              break;
-            case 'Reduce':
-              currentQuantity -= quantitySet;
-              currentStockValue -= quantitySet * pricePerUnit;
-              break;
-            case 'Sales':
-              const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
-              const costOfGoodsSold = quantitySet * avgCost;
-              currentQuantity -= quantitySet;
-              currentStockValue -= costOfGoodsSold;
-              break;
-            default:
-              break;
-          }
-          currentQuantity = currentQuantity;
-          currentStockValue = currentQuantity <= 0 ? 0 : currentStockValue;
-        });
-        return {
-          ...item.toObject(),
-          quantity: currentQuantity,
-          stockValue: parseFloat(currentStockValue.toFixed(2)),
-          isOutOfStock: currentQuantity <= 0,
-          isBelowMinQty:
-            currentQuantity <= parseInt(openingStock?.minQty||0) ? true : false,
-          isInactive: lastSaleDate
-            ? moment().diff(moment(lastSaleDate), 'days') > 60
-            : false,
-        };
-      })
-    );
-    if (qty) {
+    const itemIds = inventory.result.map((item) => item._id);
+
+    // Batch: Opening stock
+    const openingStocks = await Sale.aggregate([
+      { $match: { orderType: 'Opening', itemId: { $in: itemIds } } },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: '$itemId',
+          minQty: { $first: '$minQty' },
+        },
+      },
+    ]);
+    const openingStockMap = {};
+    openingStocks.forEach((stock) => {
+      openingStockMap[stock._id.toString()] = stock;
+    });
+
+    // Batch: All sales
+    const salesByItem = await Sale.aggregate([
+      { $match: { itemId: { $in: itemIds } } },
+      { $sort: { createdAt: 1 } },
+      {
+        $group: {
+          _id: '$itemId',
+          sales: { $push: '$$ROOT' },
+        },
+      },
+    ]);
+    const salesMap = {};
+    salesByItem.forEach((entry) => {
+      salesMap[entry._id.toString()] = entry.sales;
+    });
+
+    // Enrich inventory items
+    inventory.result = inventory.result.map((item) => {
+      const itemId = item._id.toString();
+      const sales = salesMap[itemId] || [];
+      const openingStock = openingStockMap[itemId];
+      let currentQuantity = 0;
+      let currentStockValue = 0;
+      let lastSaleDate = null;
+
+      sales.forEach((sale) => {
+        const quantitySet = parseInt(sale.quantity, 10) || 0;
+        const pricePerUnit = parseFloat(sale.pricePerUnit);
+
+        if (sale.orderType === 'Sales' && lastSaleDate === null) {
+          lastSaleDate = sale.createdAt;
+        }
+
+        switch (sale.orderType) {
+          case 'Opening':
+          case 'Add':
+            currentQuantity += quantitySet;
+            currentStockValue += quantitySet * pricePerUnit;
+            break;
+          case 'Reduce':
+            currentQuantity -= quantitySet;
+            currentStockValue -= quantitySet * pricePerUnit;
+            break;
+          case 'Sales':
+            const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
+            const costOfGoodsSold = quantitySet * avgCost;
+            currentQuantity -= quantitySet;
+            currentStockValue -= costOfGoodsSold;
+            break;
+        }
+
+        if (currentQuantity <= 0) {
+          currentStockValue = 0;
+        }
+      });
+
+      return {
+        ...item.toObject(),
+        quantity: currentQuantity,
+        stockValue: parseFloat(currentStockValue.toFixed(2)),
+        isOutOfStock: currentQuantity <= 0,
+        isBelowMinQty: currentQuantity <= parseInt(openingStock?.minQty || 0),
+        isInactive: lastSaleDate
+          ? moment().diff(moment(lastSaleDate), 'days') > 60
+          : false,
+      };
+    });
+
+    // Conditional filtering
+    if (toBool(qty)) {
       inventory.result = inventory.result.filter((item) => item.isBelowMinQty);
     }
-    if (outOfStock) {
+    if (toBool(outOfStock)) {
       inventory.result = inventory.result.filter((item) => item.isOutOfStock);
     }
-    if (inActive) {
+    if (toBool(inActive)) {
       inventory.result = inventory.result.filter((item) => item.isInactive);
     }
+
     return successResponse(res, 'Inventory fetched successfully', inventory);
   } catch (error) {
     return internalServerErrorResponse(res, error);
