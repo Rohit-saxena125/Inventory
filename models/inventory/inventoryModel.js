@@ -19,5 +19,6 @@ const inventorySchema = new mongoose.Schema({
     default:"0"
   },
 },{timestamps:true, versionKey:false});
+inventorySchema.createIndex({ itemName: "text" });
 
 module.exports = mongoose.model("Inventory",inventorySchema);
