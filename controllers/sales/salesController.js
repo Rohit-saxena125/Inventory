@@ -14,77 +14,11 @@ const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
 const mongoose = require('mongoose');
-// exports.fetchSales = async (req, res) => {
-//   try {
-//     const {
-//       page,
-//       limit,
-//       search,
-//       itemId,
-//       startDate,
-//       endDate,
-//       userId,
-//       invoiceNumber,
-//     } = req.query;
-//     const query = { isDeleted: false };
-//     if (itemId) {
-//       query.itemId = itemId;
-//     } else {
-//       query.orderType = 'Sales';
-//     }
-//     if (userId) {
-//       query.createdBy = userId;
-//     }
-//     if (startDate && endDate) {
-//       query.saleDate = {
-//         $gte: moment.tz(startDate, 'Asia/Kolkata').utc().toDate(),
-//         $lte: moment.tz(endDate, 'Asia/Kolkata').utc().toDate(),
-//       };
-//     }
-//     if (search) {
-//       query.orderType = {
-//         $regex: search,
-//         $options: 'i',
-//       };
-//     }
-//     if (invoiceNumber) {
-//       query.invoiceNumber = invoiceNumber;
-//       // query.createdBy = req.user._id;
-//     }
-//     const populate = [{ path: 'itemId', select: 'itemName' }];
-//     const sales = await pagination(
-//       Sale,
-//       query,
-//       page,
-//       limit,
-//       null,
-//       null,
-//       populate
-//     );
-//     sales.result = await Promise.all(
-//       sales.result.map(async (item) => {
-//         const totalPrice = (
-//           parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
-//         ).toFixed(2);
-//         if (item.discount === '') {
-//           item.discount = 0;
-//         }
-//         return {
-//           ...item.toObject(),
-//           totalPrice: totalPrice - parseFloat(item.discount),
-//         };
-//       })
-//     );
-//     return successResponse(res, 'Sales fetched successfully', sales);
-//   } catch (error) {
-//     return internalServerErrorResponse(res, error);
-//   }
-// };
 exports.fetchSales = async (req, res) => {
   try {
     const {
-      page = 1,
-      limit = 10,
+      page,
+      limit,
       search,
       itemId,
       startDate,
@@ -92,115 +26,56 @@ exports.fetchSales = async (req, res) => {
       userId,
       invoiceNumber,
     } = req.query;
-
-    const match = { isDeleted: false };
-
+    const query = { isDeleted: false };
     if (itemId) {
-      match.itemId = new mongoose.Types.ObjectId(itemId);
+      query.itemId = itemId;
     } else {
-      match.orderType = 'Sales';
+      query.orderType = 'Sales';
     }
-
     if (userId) {
-      match.createdBy = new mongoose.Types.ObjectId(userId);
+      query.createdBy = userId;
     }
-
     if (startDate && endDate) {
-      match.saleDate = {
-        $gte: moment.tz(startDate, 'Asia/Kolkata').startOf('day').utc().toDate(),
-        $lte: moment.tz(endDate, 'Asia/Kolkata').endOf('day').utc().toDate(),
+      query.saleDate = {
+        $gte: moment.tz(startDate, 'Asia/Kolkata').utc().toDate(),
+        $lte: moment.tz(endDate, 'Asia/Kolkata').utc().toDate(),
       };
     }
-
     if (search) {
-      match.orderType = { $regex: search, $options: 'i' };
+      query.orderType = {
+        $regex: search,
+        $options: 'i',
+      };
     }
-
     if (invoiceNumber) {
-      match.invoiceNumber = invoiceNumber;
+      query.invoiceNumber = invoiceNumber;
+      // query.createdBy = req.user._id;
     }
-
-    const pageNum = parseInt(page);
-    const pageSize = parseInt(limit);
-    const skip = (pageNum - 1) * pageSize;
-
-    const [result, total] = await Promise.all([
-      Sale.aggregate([
-        { $match: match },
-        {
-          $lookup: {
-            from: 'items',
-            localField: 'itemId',
-            foreignField: '_id',
-            as: 'item',
-          },
-        },
-        { $unwind: { path: '$item', preserveNullAndEmptyArrays: true } },
-        {
-          $addFields: {
-            totalPrice: {
-              $subtract: [
-                {
-                  $multiply: [
-                    {
-                      $convert: {
-                        input: '$pricePerUnit',
-                        to: 'double',
-                        onError: 0,
-                        onNull: 0,
-                      },
-                    },
-                    {
-                      $convert: {
-                        input: '$quantity',
-                        to: 'double',
-                        onError: 0,
-                        onNull: 0,
-                      },
-                    },
-                  ],
-                },
-                {
-                  $convert: {
-                    input: '$discount',
-                    to: 'double',
-                    onError: 0,
-                    onNull: 0,
-                  },
-                },
-              ],
-            },
-          },
-        },
-        {
-          $project: {
-            item: {
-      itemName: '$item.itemName'
-    },
-            quantity: 1,
-            customerName:1,
-            pricePerUnit: 1,
-            discount: 1,
-            saleDate: 1,
-            orderType: 1,
-            invoiceNumber: 1,
-            createdBy: 1,
-            totalPrice: 1,
-          },
-        },
-        { $sort: { saleDate: -1 } },
-        { $skip: skip },
-        { $limit: pageSize },
-      ]),
-      Sale.countDocuments(match),
-    ]);
-
-    return successResponse(res, 'Sales fetched successfully', {
-      result,
-      totalCount: total,
-      page: pageNum,
-      totalPages: Math.ceil(total / pageSize),
-    });
+    const populate = [{ path: 'itemId', select: 'itemName' }];
+    const sales = await pagination(
+      Sale,
+      query,
+      page,
+      limit,
+      null,
+      null,
+      populate
+    );
+    sales.result = await Promise.all(
+      sales.result.map(async (item) => {
+        const totalPrice = (
+          parseFloat(item.pricePerUnit) * parseFloat(item.quantity)
+        ).toFixed(2);
+        if (item.discount === '') {
+          item.discount = 0;
+        }
+        return {
+          ...item.toObject(),
+          totalPrice: totalPrice - parseFloat(item.discount),
+        };
+      })
+    );
+    return successResponse(res, 'Sales fetched successfully', sales);
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
@@ -257,7 +132,7 @@ exports.createSales = async (req, res) => {
       itemId,
       customerName,
       discount,
-      totalAmount:parseFloat(pricePerUnit * quantity),
+      totalAmount: parseFloat(pricePerUnit * quantity),
       invoiceNumber,
       createdBy: req.user._id,
     });
@@ -588,8 +463,14 @@ exports.fetchSalesReport = async (req, res) => {
 
     if (startDate && endDate) {
       matchStage.saleDate = {
-        $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').toDate(),
-        $lte: moment.tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').toDate(),
+        $gte: moment
+          .tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata')
+          .startOf('day')
+          .toDate(),
+        $lte: moment
+          .tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata')
+          .endOf('day')
+          .toDate(),
       };
     }
 
@@ -747,8 +628,6 @@ function parseAmount(val) {
   return 0;
 }
 
-
-
 exports.downloadSalesReport = async (req, res) => {
   try {
     const {
@@ -859,8 +738,8 @@ exports.downloadSalesReport = async (req, res) => {
               lastSaleDate = sale.createdAt;
             }
             switch (sale.orderType) {
-              case 'Opening': 
-              case 'Add': 
+              case 'Opening':
+              case 'Add':
                 currentQuantity += quantitySet;
                 currentStockValue += Math.abs(quantitySet * pricePerUnit);
                 break;
@@ -870,7 +749,10 @@ exports.downloadSalesReport = async (req, res) => {
                 break;
               }
               case 'Sales': {
-               const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
+                const avgCost =
+                  currentQuantity > 0
+                    ? currentStockValue / currentQuantity
+                    : pricePerUnit;
                 const costOfGoodsSold = quantitySet * avgCost;
                 currentQuantity -= quantitySet;
                 currentStockValue -= costOfGoodsSold;
@@ -951,154 +833,147 @@ exports.downloadSalesReport = async (req, res) => {
   }
 };
 
- function pad(str, width, align = "left") {
-   str = String(str);
-   if (str.length >= width) return str.slice(0, width);
-   const padSize = width - str.length;
-   return align === "right"
-     ? " ".repeat(padSize) + str
-     : str + " ".repeat(padSize);
- }
- 
- function parseAmount(val) {
-   return typeof val === "string"
-     ? parseFloat(val.replace(/[^\d.-]/g, ""))
-     : val;
- }
- 
- async function createInvoicePDF(invoiceDataArray, outputPath) {
-   return new Promise((resolve, reject) => {
-     const PAGE_WIDTH = 288; // 80mm
-     const MARGIN = 12;
-     const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-     const LINE_HEIGHT = 13;
- 
-     let lineCount = 15;
-     invoiceDataArray.forEach((sale) => {
-       const nameLength = String(sale.itemId.itemName).length;
-       lineCount += Math.ceil(nameLength / 10) + 1;
-     });
- 
-     const doc = new PDFDocument({
-       size: [PAGE_WIDTH, 30 + lineCount * LINE_HEIGHT],
-       margins: {
-         top: 30,
-         bottom: MARGIN,
-         left: MARGIN,
-         right: MARGIN,
-       },
-     });
- 
-     const stream = fs.createWriteStream(outputPath);
-     doc.pipe(stream);
- 
-     doc.font("Courier").fontSize(9);
- 
-     const firstSale = invoiceDataArray[0];
-     const formattedDate = new Date(firstSale.saleDate).toLocaleString("en-IN", {
-       timeZone: "Asia/Kolkata",
-       year: "numeric",
-       month: "short",
-       day: "2-digit",
-       hour: "2-digit",
-       minute: "2-digit",
-     });
- 
-     // Header
-     doc.text(
-       `Invoice: ${pad(firstSale.invoiceNumber || "", 10)} Date: ${formattedDate.split(",")[0]
-       }`
-     );
-     doc.text(
-      `Customer: ${String(firstSale.customerName || "").substring(0, 25)}`
-     );
-     doc.text(`Time: ${formattedDate.split(",")[1].trim()}`);
-     doc.moveDown();
-     doc.text("=".repeat(48));
- 
-     const columns = {
-       sn: 3,
-       item: 12,
-       qty: 5,
-       unit: 6,
-       rate: 8,
-       amount: 10,
-     };
- 
-     const header = [
-       pad("SN", columns.sn),
-       pad("Item Name", columns.item),
-       pad("Qty", columns.qty, "right"),
-       pad("Unit", columns.unit, "right"),
-       pad("Rate", columns.rate, "right"),
-       pad("Amount", columns.amount, "right"),
-     ].join("");
-     doc.font("Courier-Bold").text(header).font("Courier");
-     doc.text("=".repeat(48));
- 
-     let totalQty = 0;
-     let totalAmount = 0;
- 
-     invoiceDataArray.forEach((sale, index) => {
-       const itemName = String(sale.itemId.itemName || "");
-       const nameLines = [];
- 
-       for (let i = 0; i < itemName.length; i += 10) {
-         nameLines.push(itemName.substring(i, i + 10));
-       }
- 
-       const row = {
-         sn: String(index + 1),
-         qty: String(sale.quantity || 0),
-         unit: String(sale.itemId.units || "PC")
-           .substring(0, 5)
-           .toUpperCase(),
-         rate: `${parseFloat(sale.pricePerUnit).toFixed(2)}`,
-         amount: `${parseAmount(sale.totalAmount).toFixed(2)}`,
-       };
- 
-       nameLines.forEach((line, i) => {
-         const rowText = [
-           pad(i === 0 ? row.sn : "", columns.sn),
-           pad(line, columns.item),
-           pad(i === 0 ? row.qty : "", columns.qty, "right"),
-           pad(i === 0 ? row.unit : "", columns.unit, "right"),
-           pad(i === 0 ? row.rate : "", columns.rate, "right"),
-           pad(i === 0 ? row.amount : "", columns.amount, "right"),
-         ].join("");
-         doc.text(rowText);
-       });
- 
-       doc.text("-".repeat(48));
-       totalQty += parseInt(row.qty);
-       totalAmount += parseAmount(sale.totalAmount);
-     });
- 
-     doc.moveDown().font("Courier-Bold");
-     doc.text("=".repeat(48));
-     doc.text(
-       pad("Total Quantity:", 30) + pad(totalQty, 18, "right")
-     );
-     doc.text(
-       pad("Sub Total:", 30) +
-       pad(`${totalAmount.toFixed(2)}`, 18, "right")
-     );
-     doc.text(
-       pad("Total:", 30) +
-       pad(`${totalAmount.toFixed(2)}`, 18, "right")
-     );
-     doc.text("=".repeat(48));
-     doc.moveDown().fontSize(10).text("Thank you!", { align: "center" });
-     doc.text("Visit us again!", { align: "center" }).fontSize(6);
- 
-     doc.end();
- 
-     stream.on("finish", () => resolve(outputPath));
-     stream.on("error", reject);
-   });
- }
+function pad(str, width, align = 'left') {
+  str = String(str);
+  if (str.length >= width) return str.slice(0, width);
+  const padSize = width - str.length;
+  return align === 'right'
+    ? ' '.repeat(padSize) + str
+    : str + ' '.repeat(padSize);
+}
 
+function parseAmount(val) {
+  return typeof val === 'string'
+    ? parseFloat(val.replace(/[^\d.-]/g, ''))
+    : val;
+}
 
+async function createInvoicePDF(invoiceDataArray, outputPath) {
+  return new Promise((resolve, reject) => {
+    const PAGE_WIDTH = 288; // 80mm
+    const MARGIN = 12;
+    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+    const LINE_HEIGHT = 13;
+
+    let lineCount = 15;
+    invoiceDataArray.forEach((sale) => {
+      const nameLength = String(sale.itemId.itemName).length;
+      lineCount += Math.ceil(nameLength / 10) + 1;
+    });
+
+    const doc = new PDFDocument({
+      size: [PAGE_WIDTH, 30 + lineCount * LINE_HEIGHT],
+      margins: {
+        top: 30,
+        bottom: MARGIN,
+        left: MARGIN,
+        right: MARGIN,
+      },
+    });
+
+    const stream = fs.createWriteStream(outputPath);
+    doc.pipe(stream);
+
+    doc.font('Courier').fontSize(9);
+
+    const firstSale = invoiceDataArray[0];
+    const formattedDate = new Date(firstSale.saleDate).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    // Header
+    doc.text(
+      `Invoice: ${pad(firstSale.invoiceNumber || '', 10)} Date: ${
+        formattedDate.split(',')[0]
+      }`
+    );
+    doc.text(
+      `Customer: ${String(firstSale.customerName || '').substring(0, 25)}`
+    );
+    doc.text(`Time: ${formattedDate.split(',')[1].trim()}`);
+    doc.moveDown();
+    doc.text('='.repeat(48));
+
+    const columns = {
+      sn: 3,
+      item: 12,
+      qty: 5,
+      unit: 6,
+      rate: 8,
+      amount: 10,
+    };
+
+    const header = [
+      pad('SN', columns.sn),
+      pad('Item Name', columns.item),
+      pad('Qty', columns.qty, 'right'),
+      pad('Unit', columns.unit, 'right'),
+      pad('Rate', columns.rate, 'right'),
+      pad('Amount', columns.amount, 'right'),
+    ].join('');
+    doc.font('Courier-Bold').text(header).font('Courier');
+    doc.text('='.repeat(48));
+
+    let totalQty = 0;
+    let totalAmount = 0;
+
+    invoiceDataArray.forEach((sale, index) => {
+      const itemName = String(sale.itemId.itemName || '');
+      const nameLines = [];
+
+      for (let i = 0; i < itemName.length; i += 10) {
+        nameLines.push(itemName.substring(i, i + 10));
+      }
+
+      const row = {
+        sn: String(index + 1),
+        qty: String(sale.quantity || 0),
+        unit: String(sale.itemId.units || 'PC')
+          .substring(0, 5)
+          .toUpperCase(),
+        rate: `${parseFloat(sale.pricePerUnit).toFixed(2)}`,
+        amount: `${parseAmount(sale.totalAmount).toFixed(2)}`,
+      };
+
+      nameLines.forEach((line, i) => {
+        const rowText = [
+          pad(i === 0 ? row.sn : '', columns.sn),
+          pad(line, columns.item),
+          pad(i === 0 ? row.qty : '', columns.qty, 'right'),
+          pad(i === 0 ? row.unit : '', columns.unit, 'right'),
+          pad(i === 0 ? row.rate : '', columns.rate, 'right'),
+          pad(i === 0 ? row.amount : '', columns.amount, 'right'),
+        ].join('');
+        doc.text(rowText);
+      });
+
+      doc.text('-'.repeat(48));
+      totalQty += parseInt(row.qty);
+      totalAmount += parseAmount(sale.totalAmount);
+    });
+
+    doc.moveDown().font('Courier-Bold');
+    doc.text('='.repeat(48));
+    doc.text(pad('Total Quantity:', 30) + pad(totalQty, 18, 'right'));
+    doc.text(
+      pad('Sub Total:', 30) + pad(`${totalAmount.toFixed(2)}`, 18, 'right')
+    );
+    doc.text(pad('Total:', 30) + pad(`${totalAmount.toFixed(2)}`, 18, 'right'));
+    doc.text('='.repeat(48));
+    doc.moveDown().fontSize(10).text('Thank you!', { align: 'center' });
+    doc.text('Visit us again!', { align: 'center' }).fontSize(6);
+
+    doc.end();
+
+    stream.on('finish', () => resolve(outputPath));
+    stream.on('error', reject);
+  });
+}
 
 async function createSalesReportPDF(
   data,
