@@ -81,7 +81,6 @@ exports.fetchSales = async (req, res) => {
   }
 };
 
-
 exports.fetchSalesById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -959,12 +958,16 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
 
     doc.moveDown().font('Courier-Bold');
     doc.text('='.repeat(48), { lineGap: 0 });
-    doc.text(pad('Total Quantity:', 30) + pad(totalQty, 18, 'right'),);
-    doc.text(
-      pad('Sub Total:', 30) + pad(`${totalAmount.toFixed(2)}`, 18, 'right')
-    );
-    doc.text(pad('Total:', 30) + pad(`${totalAmount.toFixed(2)}`, 18, 'right'));
-    doc.text('='.repeat(48));
+    const summaryValueRow = [
+      pad('', columns.sn),
+      pad('', columns.item),
+      pad(totalQty.toString(), columns.qty, 'right'),
+      pad('', columns.unit),
+      pad('', columns.rate),
+      pad(totalAmount.toFixed(2), columns.amount, 'right'),
+    ].join('');
+    doc.text(summaryValueRow, { lineGap: 0 });
+    doc.text('-'.repeat(48), { lineGap: 0 });
     doc.moveDown().fontSize(10).text('Thank you!', { align: 'center' });
     doc.text('Visit us again!', { align: 'center' }).fontSize(6);
 
