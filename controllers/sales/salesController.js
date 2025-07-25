@@ -917,7 +917,7 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
       pad('Amount', columns.amount, 'right'),
     ].join('');
     doc.font('Courier-Bold').text(header).font('Courier');
-    doc.text('='.repeat(48));
+    doc.text('='.repeat(48), { lineGap: 0 });
 
     let totalQty = 0;
     let totalAmount = 0;
@@ -949,17 +949,17 @@ async function createInvoicePDF(invoiceDataArray, outputPath) {
           pad(i === 0 ? row.rate : '', columns.rate, 'right'),
           pad(i === 0 ? row.amount : '', columns.amount, 'right'),
         ].join('');
-        doc.text(rowText);
+        doc.text(rowText, { lineGap: 0 });
       });
 
-      doc.text('-'.repeat(48));
+      doc.text('-'.repeat(48), { lineGap: 0 });
       totalQty += parseInt(row.qty);
       totalAmount += parseAmount(sale.totalAmount);
     });
 
     doc.moveDown().font('Courier-Bold');
-    doc.text('='.repeat(48));
-    doc.text(pad('Total Quantity:', 30) + pad(totalQty, 18, 'right'));
+    doc.text('='.repeat(48), { lineGap: 0 });
+    doc.text(pad('Total Quantity:', 30) + pad(totalQty, 18, 'right'),);
     doc.text(
       pad('Sub Total:', 30) + pad(`${totalAmount.toFixed(2)}`, 18, 'right')
     );
