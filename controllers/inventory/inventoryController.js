@@ -46,11 +46,152 @@ exports.createInventory = async (req, res, next) => {
   }
 };
 
+// exports.getAllInventory = async (req, res, next) => {
+//   try {
+//     let {
+//       page,
+//       limit,
+//       search = '',
+//       startDate,
+//       endDate,
+//       qty,
+//       outOfStock,
+//       inActive,
+//     } = req.query;
+
+//     // Parse boolean flags safely
+//     const toBool = (val) => String(val).toLowerCase() === 'true';
+
+//     const query = {};
+
+//     // Date filtering
+//     if (startDate && endDate) {
+//       query.createdAt = {
+//         $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').utc().toDate(),
+//         $lte: moment.tz(endDate, 'DD-MM-YYYY', 'Asia/Kolkata').endOf('day').utc().toDate(),
+//       };
+//     }
+
+//     // Search filtering
+//     search = String(search).trim();
+//     if (search) {
+//       const cleaned = search.replace(/[^a-zA-Z0-9]/g, '');
+//       const flexibleRegex = cleaned.split('').join('[^a-zA-Z0-9]*');
+//       query.itemName = {
+//         $regex: flexibleRegex,
+//         $options: 'i',
+//       };
+//     }
+
+//     // Paginate Inventory
+//     let inventory = await pagination(Inventory, query, page, limit);
+//     const itemIds = inventory.result.map((item) => item._id);
+
+//     // Batch: Opening stock
+//     const openingStocks = await Sale.aggregate([
+//       { $match: { orderType: 'Opening', itemId: { $in: itemIds } } },
+//       { $sort: { createdAt: -1 } },
+//       {
+//         $group: {
+//           _id: '$itemId',
+//           minQty: { $first: '$minQty' },
+//         },
+//       },
+//     ]);
+//     const openingStockMap = {};
+//     openingStocks.forEach((stock) => {
+//       openingStockMap[stock._id.toString()] = stock;
+//     });
+
+//     // Batch: All sales
+//     const salesByItem = await Sale.aggregate([
+//       { $match: { itemId: { $in: itemIds } } },
+//       { $sort: { createdAt: 1 } },
+//       {
+//         $group: {
+//           _id: '$itemId',
+//           sales: { $push: '$$ROOT' },
+//         },
+//       },
+//     ]);
+//     const salesMap = {};
+//     salesByItem.forEach((entry) => {
+//       salesMap[entry._id.toString()] = entry.sales;
+//     });
+
+//     // Enrich inventory items
+//     inventory.result = inventory.result.map((item) => {
+//       const itemId = item._id.toString();
+//       const sales = salesMap[itemId] || [];
+//       const openingStock = openingStockMap[itemId];
+//       let currentQuantity = 0;
+//       let currentStockValue = 0;
+//       let lastSaleDate = null;
+
+//       sales.forEach((sale) => {
+//         const quantitySet = parseInt(sale.quantity, 10) || 0;
+//         const pricePerUnit = parseFloat(sale.pricePerUnit);
+
+//         if (sale.orderType === 'Sales' && lastSaleDate === null) {
+//           lastSaleDate = sale.createdAt;
+//         }
+
+//         switch (sale.orderType) {
+//           case 'Opening':
+//           case 'Add':
+//             currentQuantity += quantitySet;
+//             currentStockValue += quantitySet * pricePerUnit;
+//             break;
+//           case 'Reduce':
+//             currentQuantity -= quantitySet;
+//             currentStockValue -= quantitySet * pricePerUnit;
+//             break;
+//           case 'Sales':
+//             const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
+//             const costOfGoodsSold = quantitySet * avgCost;
+//             currentQuantity -= quantitySet;
+//             currentStockValue -= costOfGoodsSold;
+//             break;
+//         }
+
+//         if (currentQuantity <= 0) {
+//           currentStockValue = 0;
+//         }
+//       });
+
+//       return {
+//         ...item.toObject(),
+//         quantity: currentQuantity,
+//         stockValue: parseFloat(currentStockValue.toFixed(2)),
+//         isOutOfStock: currentQuantity <= 0,
+//         isBelowMinQty: currentQuantity <= parseInt(openingStock?.minQty || 0),
+//         isInactive: lastSaleDate
+//           ? moment().diff(moment(lastSaleDate), 'days') > 60
+//           : false,
+//       };
+//     });
+
+//     // Conditional filtering
+//     if (toBool(qty)) {
+//       inventory.result = inventory.result.filter((item) => item.isBelowMinQty);
+//     }
+//     if (toBool(outOfStock)) {
+//       inventory.result = inventory.result.filter((item) => item.isOutOfStock);
+//     }
+//     if (toBool(inActive)) {
+//       inventory.result = inventory.result.filter((item) => item.isInactive);
+//     }
+
+//     return successResponse(res, 'Inventory fetched successfully', inventory);
+//   } catch (error) {
+//     return internalServerErrorResponse(res, error);
+//   }
+// };
 exports.getAllInventory = async (req, res, next) => {
   try {
     let {
-      page,
-      limit,
+      page = 1,
+      limit = 10,
       search = '',
       startDate,
       endDate,
@@ -59,12 +200,13 @@ exports.getAllInventory = async (req, res, next) => {
       inActive,
     } = req.query;
 
-    // Parse boolean flags safely
     const toBool = (val) => String(val).toLowerCase() === 'true';
+    page = parseInt(page);
+    limit = parseInt(limit);
 
     const query = {};
 
-    // Date filtering
+    // Date filter
     if (startDate && endDate) {
       query.createdAt = {
         $gte: moment.tz(startDate, 'DD-MM-YYYY', 'Asia/Kolkata').startOf('day').utc().toDate(),
@@ -72,117 +214,126 @@ exports.getAllInventory = async (req, res, next) => {
       };
     }
 
-    // Search filtering
+    // Search filter
     search = String(search).trim();
     if (search) {
       const cleaned = search.replace(/[^a-zA-Z0-9]/g, '');
       const flexibleRegex = cleaned.split('').join('[^a-zA-Z0-9]*');
-      query.itemName = {
-        $regex: flexibleRegex,
-        $options: 'i',
-      };
+      query.itemName = { $regex: flexibleRegex, $options: 'i' };
     }
 
-    // Paginate Inventory
-    let inventory = await pagination(Inventory, query, page, limit);
-    const itemIds = inventory.result.map((item) => item._id);
+    // Fetch only item _ids for filtering & optimization
+    const items = await Inventory.find(query, '_id itemName unit').lean();
+    const itemIds = items.map((item) => item._id);
 
-    // Batch: Opening stock
-    const openingStocks = await Sale.aggregate([
-      { $match: { orderType: 'Opening', itemId: { $in: itemIds } } },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: '$itemId',
-          minQty: { $first: '$minQty' },
+    if (!itemIds.length) {
+      return successResponse(res, 'Inventory fetched successfully', {
+        result: [],
+        total: 0,
+        page,
+        limit,
+      });
+    }
+
+    // Fetch relevant sales data in parallel
+    const [openingStocks, salesByItem] = await Promise.all([
+      Sale.aggregate([
+        { $match: { orderType: 'Opening', itemId: { $in: itemIds } } },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: '$itemId',
+            minQty: { $first: '$minQty' },
+          },
         },
-      },
-    ]);
-    const openingStockMap = {};
-    openingStocks.forEach((stock) => {
-      openingStockMap[stock._id.toString()] = stock;
-    });
-
-    // Batch: All sales
-    const salesByItem = await Sale.aggregate([
-      { $match: { itemId: { $in: itemIds } } },
-      { $sort: { createdAt: 1 } },
-      {
-        $group: {
-          _id: '$itemId',
-          sales: { $push: '$$ROOT' },
+      ]),
+      Sale.aggregate([
+        { $match: { itemId: { $in: itemIds } } },
+        { $sort: { createdAt: 1 } },
+        {
+          $group: {
+            _id: '$itemId',
+            sales: { $push: '$$ROOT' },
+          },
         },
-      },
+      ]),
     ]);
-    const salesMap = {};
-    salesByItem.forEach((entry) => {
-      salesMap[entry._id.toString()] = entry.sales;
-    });
 
-    // Enrich inventory items
-    inventory.result = inventory.result.map((item) => {
+    // Map for quick access
+    const openingStockMap = Object.fromEntries(openingStocks.map(stock => [stock._id.toString(), stock]));
+    const salesMap = Object.fromEntries(salesByItem.map(entry => [entry._id.toString(), entry.sales]));
+
+    // Merge and compute enriched data
+    let enrichedItems = items.map((item) => {
       const itemId = item._id.toString();
       const sales = salesMap[itemId] || [];
       const openingStock = openingStockMap[itemId];
-      let currentQuantity = 0;
-      let currentStockValue = 0;
+
+      let quantity = 0;
+      let stockValue = 0;
       let lastSaleDate = null;
 
-      sales.forEach((sale) => {
-        const quantitySet = parseInt(sale.quantity, 10) || 0;
-        const pricePerUnit = parseFloat(sale.pricePerUnit);
+      for (const sale of sales) {
+        const qty = parseInt(sale.quantity, 10) || 0;
+        const rate = parseFloat(sale.pricePerUnit);
 
-        if (sale.orderType === 'Sales' && lastSaleDate === null) {
+        if (sale.orderType === 'Sales' && !lastSaleDate) {
           lastSaleDate = sale.createdAt;
         }
 
         switch (sale.orderType) {
           case 'Opening':
           case 'Add':
-            currentQuantity += quantitySet;
-            currentStockValue += quantitySet * pricePerUnit;
+            quantity += qty;
+            stockValue += qty * rate;
             break;
           case 'Reduce':
-            currentQuantity -= quantitySet;
-            currentStockValue -= quantitySet * pricePerUnit;
+            quantity -= qty;
+            stockValue -= qty * rate;
             break;
           case 'Sales':
-            const avgCost = currentQuantity > 0 ? currentStockValue / currentQuantity : pricePerUnit;
-            const costOfGoodsSold = quantitySet * avgCost;
-            currentQuantity -= quantitySet;
-            currentStockValue -= costOfGoodsSold;
+            const avg = quantity > 0 ? stockValue / quantity : rate;
+            quantity -= qty;
+            stockValue -= qty * avg;
             break;
         }
 
-        if (currentQuantity <= 0) {
-          currentStockValue = 0;
-        }
-      });
+        if (quantity <= 0) stockValue = 0;
+      }
 
       return {
-        ...item.toObject(),
-        quantity: currentQuantity,
-        stockValue: parseFloat(currentStockValue.toFixed(2)),
-        isOutOfStock: currentQuantity <= 0,
-        isBelowMinQty: currentQuantity <= parseInt(openingStock?.minQty || 0),
+        ...item,
+        quantity,
+        stockValue: parseFloat(stockValue.toFixed(2)),
+        isOutOfStock: quantity <= 0,
+        isBelowMinQty: quantity <= parseInt(openingStock?.minQty || 0),
         isInactive: lastSaleDate
           ? moment().diff(moment(lastSaleDate), 'days') > 60
           : false,
       };
     });
 
-    // Conditional filtering
+    // Apply filters
     if (toBool(qty)) {
-      inventory.result = inventory.result.filter((item) => item.isBelowMinQty);
+      enrichedItems = enrichedItems.filter((item) => item.isBelowMinQty);
     }
     if (toBool(outOfStock)) {
-      inventory.result = inventory.result.filter((item) => item.isOutOfStock);
+      enrichedItems = enrichedItems.filter((item) => item.isOutOfStock);
     }
     if (toBool(inActive)) {
-      inventory.result = inventory.result.filter((item) => item.isInactive);
+      enrichedItems = enrichedItems.filter((item) => item.isInactive);
     }
 
-    return successResponse(res, 'Inventory fetched successfully', inventory);
+    const total = enrichedItems.length;
+    const start = (page - 1) * limit;
+    const result = enrichedItems.slice(start, start + limit);
+
+    return successResponse(res, 'Inventory fetched successfully', {
+      result,
+      total,
+      page,
+      limit,
+    });
   } catch (error) {
     return internalServerErrorResponse(res, error);
   }
