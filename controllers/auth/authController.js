@@ -38,11 +38,11 @@ exports.sendOtp = async (req, res, next) => {
 exports.verifyOtp = async (req, res, next) => {
   try {
     const { email, otp } = req.body;
-    const otpData = await Otp.findOne({
+    const otpData = await Otp.findOneAndUpdate({
       email,
       otp,
       isUses: false,
-    }).exec();
+    },{$set:{isUses:true}},{new:true,runValidators:true}).exec();
     if (!otpData) {
       return next(badRequestErrorResponse(res, 'Invalid OTP'));
     }
