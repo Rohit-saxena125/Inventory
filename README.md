@@ -36,13 +36,13 @@ graph LR
     User([User / Operator])
     VideoSource[(Video / Frame Data)]
     System[[Airbag Screw Detection Pipeline]]
-    AnnotatedVideo[("Annotated Output Video (.mp4)")]
-    PredictionsFile[("Analytics & Prediction Outputs (JSON/CSV)")]
+    AnnotatedVideo[("Annotated Output Video .mp4")]
+    PredictionsFile[("Analytics and Prediction Outputs JSON-CSV")]
 
     VideoSource -->|Raw Video Frames| System
     User -->|Configuration & Model Weights| System
-    System -->|Visual Feedback (Boxes, IDs, States, Conf)| AnnotatedVideo
-    System -->|Structured Analytics (Hole States, Timestamps)| PredictionsFile
+    System -->|Visual Feedback - Boxes, IDs, States, Conf| AnnotatedVideo
+    System -->|Structured Analytics - Hole States, Timestamps| PredictionsFile
 ```
 
 ---
@@ -55,8 +55,8 @@ graph TB
     %% External Entities
     VideoSource[(Video Source)]
     Config[(Configuration / Weights)]
-    OutputVideo[("Annotated Video (.mp4)")]
-    OutputAnalytics[("Analytics Output (JSON/CSV)")]
+    OutputVideo[("Annotated Video .mp4")]
+    OutputAnalytics[("Analytics Output JSON-CSV")]
 
     subgraph "Airbag Screw Detection System"
         P1[1.0 Frame Extraction]
@@ -83,7 +83,7 @@ graph TB
 
     P2 -->|Detected Hole BBoxes & IDs| P3
     P3 -->|Extracted Image Crops| P4
-    P4 -->|Hole State Predictions (Empty/Filled)| DS2
+    P4 -->|Hole State Predictions - Empty or Filled| DS2
     P2 -->|Hole IDs & BBoxes| DS2
 
     DS2 -->|Combined Detections| P5
